@@ -1,0 +1,248 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  ENCARGADO
+}
+
+enum OrigenFichada {
+  IMPORTADO
+  MANUAL
+}
+
+enum TipoDia {
+  HABIL
+  SABADO
+  DOMINGO
+  FERIADO
+}
+
+enum TipoAusencia {
+  ENFERMEDAD
+  LICENCIA_GREMIAL
+  LICENCIA_MATERNIDAD
+  LICENCIA_ESTUDIO
+  FALLECIMIENTO_FAMILIAR
+  ACCIDENTE_TRABAJO
+  INJUSTIFICADA
+  OTRA
+}
+
+enum EstadoFranco {
+  PENDIENTE
+  TOMADO
+  PAGADO
+}
+
+enum TipoLiquidacion {
+  QUINCENAL
+  MENSUAL
+}
+
+enum EstadoLiquidacion {
+  BORRADOR
+  CERRADA
+}
+
+enum TipoFeriado {
+  NACIONAL
+  PROVINCIAL
+  PUENTE
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  nombre       String
+  role         Role       @default(ENCARGADO)
+  activo       Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  obras        UserObra[]
+  importBatches ImportBatch[]
+  ausenciasCargadas Absence[]
+  liquidacionesGeneradas PayrollPeriod[]
+}
+
+model Obra {
+  id        String     @id @default(cuid())
+  nombre    String
+  activo    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  empleados Employee[]
+  encargados UserObra[]
+}
+
+model UserObra {
+  id     String @id @default(cuid())
+  userId String
+  obraId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  obra   Obra   @relation(fields: [obraId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, obraId])
+}
+
+model Employee {
+  id                       String   @id @default(cuid())
+  legajo                   String   @unique
+  nombre                   String
+  apellido                 String
+  sindicato                String?
+  fechaIngreso             DateTime
+  valorHoraNormal          Float
+  obraId                   String?
+  activo                   Boolean  @default(true)
+  escalaVacacionesOverride String?
+  createdAt                DateTime @default(now())
+
+  obra              Obra?               @relation(fields: [obraId], references: [id])
+  fichadas          TimeRecord[]
+  calculosDiarios   DailyCalculation[]
+  ausencias         Absence[]
+  vacaciones        VacationPeriod[]
+  francos           FrancoCompensatorio[]
+  liquidaciones     PayrollPeriod[]
+}
+
+model TimeRecord {
+  id            String        @id @default(cuid())
+  employeeId    String
+  fecha         DateTime
+  horaEntrada   DateTime
+  horaSalida    DateTime?
+  origen        OrigenFichada @default(MANUAL)
+  importBatchId String?
+  observaciones String?
+  createdAt     DateTime      @default(now())
+
+  employee    Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  importBatch ImportBatch? @relation(fields: [importBatchId], references: [id])
+
+  @@index([employeeId, fecha])
+}
+
+model ImportBatch {
+  id                String   @id @default(cuid())
+  nombreArchivo     String
+  usuarioId         String
+  cantidadRegistros Int      @default(0)
+  cantidadErrores   Int      @default(0)
+  logDetalle        String?
+  createdAt         DateTime @default(now())
+
+  usuario     User         @relation(fields: [usuarioId], references: [id])
+  fichadas    TimeRecord[]
+}
+
+model Holiday {
+  id     String      @id @default(cuid())
+  fecha  DateTime    @unique
+  nombre String
+  tipo   TipoFeriado @default(NACIONAL)
+}
+
+model PayrollConfig {
+  id                        Int     @id @default(1)
+  horasNormalesPorDia       Float   @default(8)
+  horaCorteSabado           String  @default("12:00")
+  multiplicadorExtra50      Float   @default(1.5)
+  multiplicadorExtra100     Float   @default(2.0)
+  horasFrancoCompensatorio  Float   @default(8)
+  feriadoComoDomingo        Boolean @default(true)
+  escalaVacaciones          String  @default("[{\"hastaAnios\":5,\"dias\":14},{\"hastaAnios\":10,\"dias\":21},{\"hastaAnios\":20,\"dias\":28},{\"hastaAnios\":999,\"dias\":35}]")
+}
+
+model DailyCalculation {
+  id             String        @id @default(cuid())
+  employeeId     String
+  fecha          DateTime
+  tipoDia        TipoDia
+  horasNormales  Float         @default(0)
+  horasExtra50   Float         @default(0)
+  horasExtra100  Float         @default(0)
+  francoGenerado Boolean       @default(false)
+  ausente        Boolean       @default(false)
+  justificada    Boolean?
+  tipoAusencia   TipoAusencia?
+  observaciones  String?
+  updatedAt      DateTime      @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, fecha])
+  @@index([fecha])
+}
+
+model Absence {
+  id            String       @id @default(cuid())
+  employeeId    String
+  fechaDesde    DateTime
+  fechaHasta    DateTime
+  tipo          TipoAusencia
+  justificada   Boolean      @default(true)
+  observaciones String?
+  cargadoPorId  String
+  createdAt     DateTime     @default(now())
+
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  cargadoPor User     @relation(fields: [cargadoPorId], references: [id])
+}
+
+model VacationPeriod {
+  id                String   @id @default(cuid())
+  employeeId        String
+  anioCorrespondiente Int
+  fechaDesde        DateTime
+  fechaHasta        DateTime
+  diasTomados       Int
+  observaciones     String?
+  createdAt         DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model FrancoCompensatorio {
+  id             String       @id @default(cuid())
+  employeeId     String
+  fechaGenerado  DateTime
+  horas          Float        @default(8)
+  estado         EstadoFranco @default(PENDIENTE)
+  fechaTomado    DateTime?
+  liquidacionId  String?
+  createdAt      DateTime     @default(now())
+
+  employee    Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  liquidacion PayrollPeriod? @relation(fields: [liquidacionId], references: [id])
+}
+
+model PayrollPeriod {
+  id             String            @id @default(cuid())
+  employeeId     String
+  tipo           TipoLiquidacion
+  fechaDesde     DateTime
+  fechaHasta     DateTime
+  horasNormales  Float             @default(0)
+  horasExtra50   Float             @default(0)
+  horasExtra100  Float             @default(0)
+  cantidadFrancosPagados Int       @default(0)
+  montoNormal    Float             @default(0)
+  montoExtra50   Float             @default(0)
+  montoExtra100  Float             @default(0)
+  montoFrancos   Float             @default(0)
+  totalBruto     Float             @default(0)
+  estado         EstadoLiquidacion @default(BORRADOR)
+  generadoPorId  String
+  createdAt      DateTime          @default(now())
+
+  employee    Employee              @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  generadoPor User                  @relation(fields: [generadoPorId], references: [id])
+  francos     FrancoCompensatorio[]
+}
