@@ -21,17 +21,21 @@ router.get("/", async (req, res) => {
 });
 
 const TIPOS = [
-  "ENFERMEDAD",
+  "LICENCIA_ART",
+  "VACACIONES",
   "LICENCIA_GREMIAL",
-  "LICENCIA_MATERNIDAD",
-  "LICENCIA_ESTUDIO",
+  "PERMISO_PERSONAL",
+  "ENFERMEDAD_ACCIDENTE_INCULPABLE",
+  "LICENCIA_SIN_GOCE_SUELDO",
+  "SUSPENSION",
   "FALLECIMIENTO_FAMILIAR",
-  "ACCIDENTE_TRABAJO",
+  "EXAMEN_ESTUDIO",
+  "TARDANZA",
   "INJUSTIFICADA",
   "OTRA",
 ] as const;
 
-const ausenciaSchema = z.object({
+const ausenciaBaseSchema = z.object({
   employeeId: z.string().min(1),
   fechaDesde: z.coerce.date(),
   fechaHasta: z.coerce.date(),
@@ -39,6 +43,11 @@ const ausenciaSchema = z.object({
   justificada: z.boolean(),
   observaciones: z.string().optional(),
 });
+
+const ausenciaSchema = ausenciaBaseSchema.refine(
+  (data) => data.tipo !== "OTRA" || (data.observaciones?.trim().length ?? 0) > 0,
+  { message: "Para el tipo 'Otra' hay que aclarar el motivo en observaciones", path: ["observaciones"] }
+);
 
 router.post("/", async (req, res) => {
   const parsed = ausenciaSchema.safeParse(req.body);
@@ -51,7 +60,7 @@ router.post("/", async (req, res) => {
 });
 
 router.put("/:id", async (req, res) => {
-  const parsed = ausenciaSchema.partial().safeParse(req.body);
+  const parsed = ausenciaBaseSchema.partial().safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   const ausencia = await prisma.absence.update({ where: { id: req.params.id }, data: parsed.data });
   await recalcularEmpleadoPeriodo(ausencia.employeeId, ausencia.fechaDesde, ausencia.fechaHasta);

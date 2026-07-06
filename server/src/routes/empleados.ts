@@ -7,8 +7,12 @@ const router = Router();
 
 router.get("/", async (req, res) => {
   const scope = obraScope(req);
+  const { activo } = req.query as Record<string, string | undefined>;
   const empleados = await prisma.employee.findMany({
-    where: scope ? { obraId: { in: scope } } : undefined,
+    where: {
+      ...(scope ? { obraId: { in: scope } } : {}),
+      ...(activo === "true" ? { activo: true } : activo === "false" ? { activo: false } : {}),
+    },
     include: { obra: true },
     orderBy: [{ apellido: "asc" }, { nombre: "asc" }],
   });
@@ -51,6 +55,27 @@ router.put("/:id", requireAdmin, async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   const empleado = await prisma.employee.update({ where: { id: req.params.id }, data: parsed.data });
   res.json(empleado);
+});
+
+router.delete("/:id", requireAdmin, async (req, res) => {
+  const id = req.params.id;
+  const [fichadas, ausencias, vacaciones, francos, liquidaciones, calculos] = await Promise.all([
+    prisma.timeRecord.count({ where: { employeeId: id } }),
+    prisma.absence.count({ where: { employeeId: id } }),
+    prisma.vacationPeriod.count({ where: { employeeId: id } }),
+    prisma.francoCompensatorio.count({ where: { employeeId: id } }),
+    prisma.payrollPeriod.count({ where: { employeeId: id } }),
+    prisma.dailyCalculation.count({ where: { employeeId: id } }),
+  ]);
+  const tieneHistorial = fichadas + ausencias + vacaciones + francos + liquidaciones + calculos > 0;
+  if (tieneHistorial) {
+    return res.status(409).json({
+      error:
+        "No se puede eliminar: el empleado tiene fichadas, ausencias, vacaciones u otros registros históricos. Dalo de baja (marcalo inactivo) para conservar el historial en su lugar.",
+    });
+  }
+  await prisma.employee.delete({ where: { id } });
+  res.status(204).end();
 });
 
 export default router;

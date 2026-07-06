@@ -5,7 +5,15 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { recalcularEmpleadoPeriodo } from "../engine/recalcular.js";
 import { localDateTime } from "../lib/dates.js";
-import { parseMarcaciones, parseWorkbookAllSheets, pickBestSheet, toDateOnlyFromCell, type ParsedSheet } from "../lib/excelImport.js";
+import {
+  horaStringToDate,
+  parseWorkbookAllSheets,
+  pickBestSheet,
+  reconciliarMarcaciones,
+  tokenizeMarcaciones,
+  toDateOnlyFromCell,
+  type ParsedSheet,
+} from "../lib/excelImport.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -86,11 +94,6 @@ function combineFechaHora(fecha: Date, value: unknown): Date | null {
   return null;
 }
 
-function horaStringToDate(fecha: Date, hhmm: string): Date {
-  const [h, m] = hhmm.split(":").map(Number);
-  return localDateTime(fecha, h, m);
-}
-
 const confirmSchema = z.object({
   token: z.string(),
   sheet: z.string(),
@@ -131,6 +134,15 @@ router.post("/confirm", async (req, res) => {
     }
   }
 
+  interface FilaValida {
+    idx: number;
+    legajo: string;
+    employeeId: string;
+    fecha: Date;
+    row: Record<string, unknown>;
+  }
+  const filasValidas: FilaValida[] = [];
+
   hoja.rows.forEach((row, idx) => {
     const legajoRaw = String(row[mapping.legajo] ?? "").trim();
     if (!legajoRaw) return; // fila vacía
@@ -144,38 +156,59 @@ router.post("/confirm", async (req, res) => {
       errores.push(`Fila ${idx + 2}: fecha inválida`);
       return;
     }
+    filasValidas.push({ idx, legajo: legajoRaw, employeeId, fecha, row });
+  });
 
-    if (mapping.modo === "combinado") {
-      const raw = String(row[mapping.marcaciones ?? ""] ?? "").trim();
-      if (!raw) return; // día sin marcaciones (franco, ausente, etc.)
-      const pares = parseMarcaciones(raw);
-      if (pares.length === 0) {
-        errores.push(`Fila ${idx + 2}: no se pudieron interpretar las marcaciones "${raw}"`);
-        return;
+  if (mapping.modo === "combinado") {
+    const porEmpleado = new Map<string, FilaValida[]>();
+    for (const f of filasValidas) {
+      if (!porEmpleado.has(f.employeeId)) porEmpleado.set(f.employeeId, []);
+      porEmpleado.get(f.employeeId)!.push(f);
+    }
+
+    for (const [employeeId, filas] of porEmpleado) {
+      filas.sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
+      const legajo = filas[0].legajo;
+
+      for (const f of filas) {
+        const raw = String(f.row[mapping.marcaciones ?? ""] ?? "").trim();
+        if (raw && tokenizeMarcaciones(raw).length === 0) {
+          errores.push(`Fila ${f.idx + 2} (legajo ${legajo}): no se pudieron interpretar las marcaciones "${raw}"`);
+        }
       }
-      for (const par of pares) {
+
+      const dias = filas.map((f) => ({ fecha: f.fecha, raw: String(f.row[mapping.marcaciones ?? ""] ?? "").trim() }));
+      const { turnos, avisos } = reconciliarMarcaciones(dias);
+
+      for (const turno of turnos) {
         created.push({
           employeeId,
-          fecha,
-          horaEntrada: horaStringToDate(fecha, par.entradaStr),
-          horaSalida: par.salidaStr ? horaStringToDate(fecha, par.salidaStr) : null,
+          fecha: turno.fecha,
+          horaEntrada: horaStringToDate(turno.fecha, turno.entradaStr),
+          horaSalida: turno.salidaStr ? horaStringToDate(turno.fechaSalida, turno.salidaStr) : null,
         });
         insertados += 1;
+        marcarRango(employeeId, turno.fecha);
+        if (turno.fechaSalida.getTime() !== turno.fecha.getTime()) marcarRango(employeeId, turno.fechaSalida);
       }
-      marcarRango(employeeId, fecha);
-      return;
+      for (const aviso of avisos) {
+        const fechaStr = aviso.fecha.toISOString().slice(0, 10);
+        errores.push(`Legajo ${legajo}, ${fechaStr}: ${aviso.mensaje}`);
+      }
     }
-
-    const horaEntrada = combineFechaHora(fecha, row[mapping.horaEntrada ?? ""]);
-    if (!horaEntrada) {
-      errores.push(`Fila ${idx + 2}: hora de entrada inválida`);
-      return;
+  } else {
+    for (const f of filasValidas) {
+      const horaEntrada = combineFechaHora(f.fecha, f.row[mapping.horaEntrada ?? ""]);
+      if (!horaEntrada) {
+        errores.push(`Fila ${f.idx + 2}: hora de entrada inválida`);
+        continue;
+      }
+      const horaSalida = mapping.horaSalida ? combineFechaHora(f.fecha, f.row[mapping.horaSalida]) : null;
+      created.push({ employeeId: f.employeeId, fecha: f.fecha, horaEntrada, horaSalida });
+      marcarRango(f.employeeId, f.fecha);
+      insertados += 1;
     }
-    const horaSalida = mapping.horaSalida ? combineFechaHora(fecha, row[mapping.horaSalida]) : null;
-    created.push({ employeeId, fecha, horaEntrada, horaSalida });
-    marcarRango(employeeId, fecha);
-    insertados += 1;
-  });
+  }
 
   const batch = await prisma.importBatch.create({
     data: {

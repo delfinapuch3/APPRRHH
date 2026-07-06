@@ -45,10 +45,11 @@ export default function Empleados() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [mostrarInactivos, setMostrarInactivos] = useState(false);
 
   const { data: empleados, isLoading } = useQuery({
-    queryKey: ["empleados"],
-    queryFn: async () => (await api.get("/empleados")).data as Empleado[],
+    queryKey: ["empleados", mostrarInactivos],
+    queryFn: async () => (await api.get(`/empleados${mostrarInactivos ? "" : "?activo=true"}`)).data as Empleado[],
   });
   const { data: obras } = useQuery({
     queryKey: ["obras"],
@@ -155,6 +156,11 @@ export default function Empleados() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold text-slate-800">Empleados</h1>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm text-slate-600">
+            <input type="checkbox" checked={mostrarInactivos} onChange={(e) => setMostrarInactivos(e.target.checked)} />
+            Mostrar inactivos
+          </label>
         {isAdmin && (
           <div className="flex gap-2">
             <button
@@ -177,6 +183,7 @@ export default function Empleados() {
             </button>
           </div>
         )}
+        </div>
       </div>
 
       {showImport && (
@@ -376,12 +383,13 @@ export default function Empleados() {
             </thead>
             <tbody>
               {empleados?.map((e) => (
-                <tr key={e.id} className="border-b last:border-0">
+                <tr key={e.id} className={`border-b last:border-0 ${!e.activo ? "opacity-50" : ""}`}>
                   <td className="py-2">{e.legajo}</td>
                   <td className="py-2">
                     <Link to={`/empleados/${e.id}`} className="text-slate-700 hover:underline">
                       {e.apellido}, {e.nombre}
                     </Link>
+                    {!e.activo && <span className="ml-2 text-xs text-red-600">(inactivo)</span>}
                   </td>
                   <td className="py-2">{e.sindicato ?? "-"}</td>
                   <td className="py-2">{e.obra?.nombre ?? "-"}</td>

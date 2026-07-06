@@ -31,6 +31,19 @@ Cambiá estas contraseñas antes de usar la app con datos reales (desde `/config
 - Extra 50%: a partir de la 9na hora, lunes a sábado hasta las 12:00.
 - Extra 100%: sábados desde las 12:00 y domingos/feriados.
 - Franco compensatorio: se genera automáticamente (8 horas a valor hora normal) cada vez que un empleado trabaja un domingo o feriado.
+- Turnos que cruzan la medianoche (ej. 20 a 4): se reparten automáticamente entre los dos días calendario según la hora real de cada tramo.
+
+## Ausencias
+
+Tipos disponibles: licencia por ART, vacaciones, licencia gremial, permiso personal, enfermedad/accidente inculpable, licencia sin goce de sueldo, suspensión, fallecimiento de familiar, examen/estudio, tardanza, ausencia injustificada y otra (requiere aclarar el motivo).
+
+Se pueden cargar de dos formas:
+- Desde **Asistencia** (vista por período o por día): clasificás las faltas que el sistema detectó automáticamente (día sin fichada).
+- Desde la ficha del empleado (pestaña "ausencias"): registrás cualquier incidencia para un rango de fechas, incluidas las que no implican falta total (tardanza, suspensión, etc).
+
+## Importar fichadas del reloj
+
+El importador soporta el formato con columna "Marcaciones" combinada (ej. `E 08:07 - S 15:56`) y detecta automáticamente los turnos que cruzan la medianoche: si un día queda con una entrada sin cierre, prueba emparejarla con la primera marca del día siguiente y, si la duración resultante es razonable para un turno (2 a 14 horas), la toma como la salida real. Si no encuentra un cierre plausible, la deja marcada para revisión manual en el resumen de la importación.
 
 ## Restablecer la base de datos con datos de ejemplo
 

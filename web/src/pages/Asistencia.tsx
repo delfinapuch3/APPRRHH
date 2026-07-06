@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client.js";
+import { TIPOS_AUSENCIA, labelTipoAusencia } from "../lib/tiposAusencia.js";
 
 function firstOfMonth() {
   const d = new Date();
@@ -10,34 +11,33 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-const TIPOS_AUSENCIA = [
-  ["ENFERMEDAD", "Enfermedad"],
-  ["LICENCIA_GREMIAL", "Licencia gremial"],
-  ["LICENCIA_MATERNIDAD", "Licencia maternidad/paternidad"],
-  ["LICENCIA_ESTUDIO", "Licencia por estudio"],
-  ["FALLECIMIENTO_FAMILIAR", "Fallecimiento familiar"],
-  ["ACCIDENTE_TRABAJO", "Accidente de trabajo"],
-  ["INJUSTIFICADA", "Injustificada"],
-  ["OTRA", "Otra"],
-] as const;
-
 export default function Asistencia() {
   const queryClient = useQueryClient();
+  const [vista, setVista] = useState<"periodo" | "dia">("periodo");
   const [desde, setDesde] = useState(firstOfMonth());
   const [hasta, setHasta] = useState(today());
+  const [diaSeleccionado, setDiaSeleccionado] = useState(today());
   const [seleccion, setSeleccion] = useState<{ employeeId: string; fecha: string; nombre: string } | null>(null);
-  const [tipo, setTipo] = useState<string>("ENFERMEDAD");
+  const [tipo, setTipo] = useState<string>("ENFERMEDAD_ACCIDENTE_INCULPABLE");
   const [justificada, setJustificada] = useState(true);
   const [observaciones, setObservaciones] = useState("");
 
   const { data: resumen, isLoading } = useQuery({
     queryKey: ["asistencia-resumen", desde, hasta],
     queryFn: async () => (await api.get(`/asistencia/resumen?desde=${desde}&hasta=${hasta}`)).data,
+    enabled: vista === "periodo",
   });
 
   const { data: faltas } = useQuery({
     queryKey: ["faltas-sin-clasificar", desde, hasta],
     queryFn: async () => (await api.get(`/asistencia/faltas-sin-clasificar?desde=${desde}&hasta=${hasta}`)).data as any[],
+    enabled: vista === "periodo",
+  });
+
+  const { data: rosterDia, isLoading: cargandoDia } = useQuery({
+    queryKey: ["asistencia-dia", diaSeleccionado],
+    queryFn: async () => (await api.get(`/asistencia/dia?fecha=${diaSeleccionado}`)).data as { empleados: any[] },
+    enabled: vista === "dia",
   });
 
   const clasificar = useMutation({
@@ -53,6 +53,7 @@ export default function Asistencia() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["faltas-sin-clasificar"] });
       queryClient.invalidateQueries({ queryKey: ["asistencia-resumen"] });
+      queryClient.invalidateQueries({ queryKey: ["asistencia-dia"] });
       setSeleccion(null);
       setObservaciones("");
     },
@@ -62,95 +63,181 @@ export default function Asistencia() {
     <div>
       <h1 className="text-2xl font-semibold text-slate-800 mb-6">Asistencia</h1>
 
-      <div className="flex gap-4 items-end mb-6 bg-white rounded-lg shadow-sm p-4">
-        <div>
-          <label className="block text-xs text-slate-500 mb-1">Desde</label>
-          <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="border border-slate-300 rounded-md px-2 py-1.5 text-sm" />
-        </div>
-        <div>
-          <label className="block text-xs text-slate-500 mb-1">Hasta</label>
-          <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="border border-slate-300 rounded-md px-2 py-1.5 text-sm" />
-        </div>
-        <div className="text-sm text-slate-500 ml-auto">
-          % asistencia general: <span className="font-semibold text-slate-800">{resumen?.porcentajeGeneral ?? "-"}%</span>
-        </div>
+      <div className="flex gap-2 mb-6">
+        <button
+          onClick={() => setVista("periodo")}
+          className={`px-4 py-2 rounded-md text-sm ${vista === "periodo" ? "bg-slate-900 text-white" : "bg-white text-slate-600"}`}
+        >
+          Por período
+        </button>
+        <button
+          onClick={() => setVista("dia")}
+          className={`px-4 py-2 rounded-md text-sm ${vista === "dia" ? "bg-slate-900 text-white" : "bg-white text-slate-600"}`}
+        >
+          Por día
+        </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm p-5 mb-6">
-        <h2 className="font-medium text-slate-700 mb-3">Faltas sin clasificar ({faltas?.length ?? 0})</h2>
-        {faltas?.length === 0 && <p className="text-sm text-slate-500">No hay faltas pendientes de clasificar en el período.</p>}
-        {faltas && faltas.length > 0 && (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-slate-500 border-b">
-                <th className="pb-2">Fecha</th>
-                <th className="pb-2">Empleado</th>
-                <th className="pb-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {faltas.map((f) => (
-                <tr key={f.id} className="border-b last:border-0">
-                  <td className="py-2">{new Date(f.fecha).toLocaleDateString("es-AR", { timeZone: "UTC" })}</td>
-                  <td className="py-2">
-                    {f.employee.apellido}, {f.employee.nombre} ({f.employee.legajo})
-                  </td>
-                  <td className="py-2 text-right">
-                    <button
-                      onClick={() =>
-                        setSeleccion({
-                          employeeId: f.employeeId,
-                          fecha: f.fecha.slice(0, 10),
-                          nombre: `${f.employee.apellido}, ${f.employee.nombre}`,
-                        })
-                      }
-                      className="text-slate-700 underline text-sm"
-                    >
-                      Clasificar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {vista === "periodo" && (
+        <>
+          <div className="flex gap-4 items-end mb-6 bg-white rounded-lg shadow-sm p-4">
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">Desde</label>
+              <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="border border-slate-300 rounded-md px-2 py-1.5 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">Hasta</label>
+              <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="border border-slate-300 rounded-md px-2 py-1.5 text-sm" />
+            </div>
+            <div className="text-sm text-slate-500 ml-auto">
+              % asistencia general: <span className="font-semibold text-slate-800">{resumen?.porcentajeGeneral ?? "-"}%</span>
+            </div>
+          </div>
 
-      <div className="bg-white rounded-lg shadow-sm p-5">
-        <h2 className="font-medium text-slate-700 mb-3">Asistencia por empleado</h2>
-        {isLoading ? (
-          <p className="text-slate-500 text-sm">Cargando...</p>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-slate-500 border-b">
-                <th className="pb-2">Legajo</th>
-                <th className="pb-2">Nombre</th>
-                <th className="pb-2">Días esperados</th>
-                <th className="pb-2">Presentes</th>
-                <th className="pb-2">Justificadas</th>
-                <th className="pb-2">Injustificadas</th>
-                <th className="pb-2">Sin clasificar</th>
-                <th className="pb-2">% Asistencia</th>
-              </tr>
-            </thead>
-            <tbody>
-              {resumen?.empleados.map((e: any) => (
-                <tr key={e.employeeId} className="border-b last:border-0">
-                  <td className="py-2">{e.legajo}</td>
-                  <td className="py-2">{e.nombre}</td>
-                  <td className="py-2">{e.diasEsperados}</td>
-                  <td className="py-2">{e.presentes}</td>
-                  <td className="py-2">{e.ausenciasJustificadas}</td>
-                  <td className="py-2 text-red-600">{e.ausenciasInjustificadas}</td>
-                  <td className="py-2 text-amber-600">{e.ausenciasSinClasificar}</td>
-                  <td className="py-2 font-medium">{e.porcentajeAsistencia}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+          <div className="bg-white rounded-lg shadow-sm p-5 mb-6">
+            <h2 className="font-medium text-slate-700 mb-3">Faltas sin clasificar ({faltas?.length ?? 0})</h2>
+            {faltas?.length === 0 && <p className="text-sm text-slate-500">No hay faltas pendientes de clasificar en el período.</p>}
+            {faltas && faltas.length > 0 && (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-slate-500 border-b">
+                    <th className="pb-2">Fecha</th>
+                    <th className="pb-2">Empleado</th>
+                    <th className="pb-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {faltas.map((f) => (
+                    <tr key={f.id} className="border-b last:border-0">
+                      <td className="py-2">{new Date(f.fecha).toLocaleDateString("es-AR", { timeZone: "UTC" })}</td>
+                      <td className="py-2">
+                        {f.employee.apellido}, {f.employee.nombre} ({f.employee.legajo})
+                      </td>
+                      <td className="py-2 text-right">
+                        <button
+                          onClick={() =>
+                            setSeleccion({
+                              employeeId: f.employeeId,
+                              fecha: f.fecha.slice(0, 10),
+                              nombre: `${f.employee.apellido}, ${f.employee.nombre}`,
+                            })
+                          }
+                          className="text-slate-700 underline text-sm"
+                        >
+                          Clasificar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-5">
+            <h2 className="font-medium text-slate-700 mb-3">Asistencia por empleado</h2>
+            {isLoading ? (
+              <p className="text-slate-500 text-sm">Cargando...</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-slate-500 border-b">
+                    <th className="pb-2">Legajo</th>
+                    <th className="pb-2">Nombre</th>
+                    <th className="pb-2">Días esperados</th>
+                    <th className="pb-2">Presentes</th>
+                    <th className="pb-2">Justificadas</th>
+                    <th className="pb-2">Injustificadas</th>
+                    <th className="pb-2">Sin clasificar</th>
+                    <th className="pb-2">% Asistencia</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {resumen?.empleados.map((e: any) => (
+                    <tr key={e.employeeId} className="border-b last:border-0">
+                      <td className="py-2">{e.legajo}</td>
+                      <td className="py-2">{e.nombre}</td>
+                      <td className="py-2">{e.diasEsperados}</td>
+                      <td className="py-2">{e.presentes}</td>
+                      <td className="py-2">{e.ausenciasJustificadas}</td>
+                      <td className="py-2 text-red-600">{e.ausenciasInjustificadas}</td>
+                      <td className="py-2 text-amber-600">{e.ausenciasSinClasificar}</td>
+                      <td className="py-2 font-medium">{e.porcentajeAsistencia}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
+
+      {vista === "dia" && (
+        <>
+          <div className="flex gap-4 items-end mb-6 bg-white rounded-lg shadow-sm p-4">
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">Día</label>
+              <input
+                type="date"
+                value={diaSeleccionado}
+                onChange={(e) => setDiaSeleccionado(e.target.value)}
+                className="border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-5">
+            <h2 className="font-medium text-slate-700 mb-3">
+              Quién faltó el {new Date(diaSeleccionado).toLocaleDateString("es-AR", { timeZone: "UTC" })}
+            </h2>
+            {cargandoDia ? (
+              <p className="text-slate-500 text-sm">Cargando...</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-slate-500 border-b">
+                    <th className="pb-2">Legajo</th>
+                    <th className="pb-2">Nombre</th>
+                    <th className="pb-2">Estado</th>
+                    <th className="pb-2">Horas trabajadas</th>
+                    <th className="pb-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rosterDia?.empleados.map((e) => (
+                    <tr key={e.employeeId} className="border-b last:border-0">
+                      <td className="py-2">{e.legajo}</td>
+                      <td className="py-2">{e.nombre}</td>
+                      <td className="py-2">
+                        {!e.ausente ? (
+                          <span className="text-emerald-700">Presente</span>
+                        ) : e.justificada === true ? (
+                          <span className="text-slate-600">Ausente · {labelTipoAusencia(e.tipoAusencia)}</span>
+                        ) : e.justificada === false ? (
+                          <span className="text-red-600">Ausente injustificado</span>
+                        ) : (
+                          <span className="text-amber-600">Ausente sin clasificar</span>
+                        )}
+                      </td>
+                      <td className="py-2">{e.horasTrabajadas.toFixed(1)}</td>
+                      <td className="py-2 text-right">
+                        {e.ausente && e.justificada === null && (
+                          <button
+                            onClick={() => setSeleccion({ employeeId: e.employeeId, fecha: diaSeleccionado, nombre: e.nombre })}
+                            className="text-slate-700 underline text-sm"
+                          >
+                            Clasificar
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
 
       {seleccion && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center" onClick={() => setSeleccion(null)}>
@@ -187,7 +274,9 @@ export default function Asistencia() {
               </div>
             )}
             <div className="mb-4">
-              <label className="block text-xs text-slate-500 mb-1">Observaciones</label>
+              <label className="block text-xs text-slate-500 mb-1">
+                Observaciones {justificada && tipo === "OTRA" ? "(obligatorio: aclarar el motivo)" : ""}
+              </label>
               <textarea
                 value={observaciones}
                 onChange={(e) => setObservaciones(e.target.value)}
@@ -201,7 +290,8 @@ export default function Asistencia() {
               </button>
               <button
                 onClick={() => clasificar.mutate()}
-                className="bg-slate-900 text-white text-sm px-4 py-2 rounded-md hover:bg-slate-800"
+                disabled={justificada && tipo === "OTRA" && !observaciones.trim()}
+                className="bg-slate-900 text-white text-sm px-4 py-2 rounded-md hover:bg-slate-800 disabled:opacity-50"
               >
                 Guardar
               </button>

@@ -66,6 +66,47 @@ router.get("/resumen", async (req, res) => {
   res.json({ fechaDesde, fechaHasta, porcentajeGeneral, empleados: porEmpleado });
 });
 
+router.get("/dia", async (req, res) => {
+  const scope = obraScope(req);
+  const { fecha, obraId } = req.query as Record<string, string | undefined>;
+  const dia = fecha ? new Date(fecha) : new Date();
+
+  const effectiveObraId = scope ? (scope.includes(obraId ?? "") ? obraId! : scope[0] ?? null) : obraId ?? null;
+  await recalcularObraPeriodo(effectiveObraId, dia, dia);
+
+  const empleados = await prisma.employee.findMany({
+    where: {
+      activo: true,
+      ...(scope ? { obraId: { in: scope } } : obraId ? { obraId } : {}),
+    },
+    orderBy: [{ apellido: "asc" }, { nombre: "asc" }],
+  });
+
+  const calculos = await prisma.dailyCalculation.findMany({
+    where: { employeeId: { in: empleados.map((e) => e.id) }, fecha: dia },
+  });
+  const porEmpleado = new Map(calculos.map((c) => [c.employeeId, c]));
+
+  const roster = empleados.map((emp) => {
+    const c = porEmpleado.get(emp.id);
+    const horasTrabajadas = c ? c.horasNormales + c.horasExtra50 + c.horasExtra100 : 0;
+    return {
+      employeeId: emp.id,
+      legajo: emp.legajo,
+      nombre: `${emp.apellido}, ${emp.nombre}`,
+      obra: emp.obraId,
+      tipoDia: c?.tipoDia ?? null,
+      horasTrabajadas,
+      ausente: c?.ausente ?? false,
+      justificada: c?.justificada ?? null,
+      tipoAusencia: c?.tipoAusencia ?? null,
+      observaciones: c?.observaciones ?? null,
+    };
+  });
+
+  res.json({ fecha: dia, empleados: roster });
+});
+
 router.get("/faltas-sin-clasificar", async (req, res) => {
   const scope = obraScope(req);
   const { fechaDesde, fechaHasta } = parseRange(req);
