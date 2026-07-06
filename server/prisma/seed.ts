@@ -56,27 +56,49 @@ async function main() {
     create: {
       email: "encargado@empresa.com",
       passwordHash: encargadoPassword,
-      nombre: "Encargado de Obra",
+      nombre: "Encargado de Sector",
       role: "ENCARGADO",
     },
   });
 
-  const obra = await prisma.obra.upsert({
-    where: { id: "obra-demo" },
+  const polcecal = await prisma.empresa.upsert({
+    where: { nombre: "POLCECAL" },
     update: {},
-    create: { id: "obra-demo", nombre: "Obra Demo - Edificio Central" },
+    create: { nombre: "POLCECAL" },
+  });
+  const polysan = await prisma.empresa.upsert({
+    where: { nombre: "POLYSAN" },
+    update: {},
+    create: { nombre: "POLYSAN" },
   });
 
-  await prisma.userObra.upsert({
-    where: { userId_obraId: { userId: encargado.id, obraId: obra.id } },
+  const sectorFrancisco = await prisma.sector.upsert({
+    where: { id: "sector-francisco" },
     update: {},
-    create: { userId: encargado.id, obraId: obra.id },
+    create: { id: "sector-francisco", nombre: "Francisco", empresaId: polcecal.id },
+  });
+  await prisma.sector.upsert({
+    where: { id: "sector-administracion" },
+    update: {},
+    create: { id: "sector-administracion", nombre: "Administración", empresaId: polcecal.id },
+  });
+  await prisma.sector.upsert({
+    where: { id: "sector-planta" },
+    update: {},
+    create: { id: "sector-planta", nombre: "Planta", empresaId: polysan.id },
+  });
+
+  await prisma.userSector.upsert({
+    where: { userId_sectorId: { userId: encargado.id, sectorId: sectorFrancisco.id } },
+    update: {},
+    create: { userId: encargado.id, sectorId: sectorFrancisco.id },
   });
 
   const empleadosDemo = [
-    { legajo: "1001", nombre: "Juan", apellido: "Pérez", valorHoraNormal: 3500, fechaIngreso: "2018-03-01" },
-    { legajo: "1002", nombre: "Carlos", apellido: "Gómez", valorHoraNormal: 3200, fechaIngreso: "2021-06-15" },
-    { legajo: "1003", nombre: "Miguel", apellido: "Fernández", valorHoraNormal: 3800, fechaIngreso: "2010-01-10" },
+    { legajo: "1001", nombre: "Juan", apellido: "Pérez", valorHoraNormal: 3500, fechaIngreso: "2018-03-01", horasTeoricasDiarias: 8 },
+    { legajo: "1002", nombre: "Carlos", apellido: "Gómez", valorHoraNormal: 3200, fechaIngreso: "2021-06-15", horasTeoricasDiarias: 8 },
+    { legajo: "1003", nombre: "Miguel", apellido: "Fernández", valorHoraNormal: 3800, fechaIngreso: "2010-01-10", horasTeoricasDiarias: 8 },
+    { legajo: "1004", nombre: "Sofía", apellido: "Ramírez", valorHoraNormal: 2000, fechaIngreso: "2026-03-01", horasTeoricasDiarias: 4 },
   ];
 
   for (const e of empleadosDemo) {
@@ -88,8 +110,9 @@ async function main() {
         nombre: e.nombre,
         apellido: e.apellido,
         valorHoraNormal: e.valorHoraNormal,
+        horasTeoricasDiarias: e.horasTeoricasDiarias,
         fechaIngreso: new Date(e.fechaIngreso),
-        obraId: obra.id,
+        sectorId: sectorFrancisco.id,
       },
     });
   }

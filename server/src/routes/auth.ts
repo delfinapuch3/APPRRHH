@@ -17,7 +17,7 @@ router.post("/login", async (req, res) => {
     return res.status(400).json({ error: "Datos inválidos" });
   }
   const { email, password } = parsed.data;
-  const user = await prisma.user.findUnique({ where: { email }, include: { obras: true } });
+  const user = await prisma.user.findUnique({ where: { email }, include: { sectores: true } });
   if (!user || !user.activo) {
     return res.status(401).json({ error: "Credenciales inválidas" });
   }
@@ -33,7 +33,7 @@ router.post("/login", async (req, res) => {
       email: user.email,
       nombre: user.nombre,
       role: user.role,
-      obraIds: user.obras.map((o) => o.obraId),
+      sectorIds: user.sectores.map((s) => s.sectorId),
     },
   });
 });

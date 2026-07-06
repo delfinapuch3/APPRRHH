@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api/client.js";
@@ -12,11 +12,12 @@ interface Empleado {
   sindicato: string | null;
   fechaIngreso: string;
   valorHoraNormal: number;
+  horasTeoricasDiarias: number;
   activo: boolean;
-  obra: { id: string; nombre: string } | null;
+  sector: { id: string; nombre: string; empresa: { nombre: string } | null } | null;
 }
 
-interface Obra {
+interface Sector {
   id: string;
   nombre: string;
 }
@@ -37,7 +38,8 @@ const MAPPING_FIELDS = [
   ["sindicato", "Sindicato (opcional)"],
   ["valorHoraNormal", "Valor hora normal"],
   ["fechaIngreso", "Fecha de ingreso"],
-  ["obra", "Obra (opcional)"],
+  ["sector", "Sector (opcional)"],
+  ["horasTeoricasDiarias", "Horas teóricas diarias (opcional)"],
 ] as const;
 
 export default function Empleados() {
@@ -46,16 +48,26 @@ export default function Empleados() {
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [mostrarInactivos, setMostrarInactivos] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
 
   const { data: empleados, isLoading } = useQuery({
     queryKey: ["empleados", mostrarInactivos],
     queryFn: async () => (await api.get(`/empleados${mostrarInactivos ? "" : "?activo=true"}`)).data as Empleado[],
   });
-  const { data: obras } = useQuery({
-    queryKey: ["obras"],
-    queryFn: async () => (await api.get("/obras")).data as Obra[],
+  const { data: sectores } = useQuery({
+    queryKey: ["sectores"],
+    queryFn: async () => (await api.get("/sectores")).data as Sector[],
     enabled: isAdmin,
   });
+
+  const empleadosFiltrados = useMemo(() => {
+    if (!empleados) return empleados;
+    const q = busqueda.trim().toLowerCase();
+    if (!q) return empleados;
+    return empleados.filter(
+      (e) => e.legajo.toLowerCase().includes(q) || e.nombre.toLowerCase().includes(q) || e.apellido.toLowerCase().includes(q)
+    );
+  }, [empleados, busqueda]);
 
   const [form, setForm] = useState({
     legajo: "",
@@ -64,7 +76,8 @@ export default function Empleados() {
     sindicato: "",
     fechaIngreso: "",
     valorHoraNormal: "",
-    obraId: "",
+    horasTeoricasDiarias: "8",
+    sectorId: "",
   });
 
   const crear = useMutation({
@@ -73,12 +86,22 @@ export default function Empleados() {
         ...form,
         sindicato: form.sindicato || null,
         valorHoraNormal: Number(form.valorHoraNormal),
-        obraId: form.obraId || null,
+        horasTeoricasDiarias: Number(form.horasTeoricasDiarias),
+        sectorId: form.sectorId || null,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["empleados"] });
       setShowForm(false);
-      setForm({ legajo: "", nombre: "", apellido: "", sindicato: "", fechaIngreso: "", valorHoraNormal: "", obraId: "" });
+      setForm({
+        legajo: "",
+        nombre: "",
+        apellido: "",
+        sindicato: "",
+        fechaIngreso: "",
+        valorHoraNormal: "",
+        horasTeoricasDiarias: "8",
+        sectorId: "",
+      });
     },
   });
 
@@ -91,9 +114,24 @@ export default function Empleados() {
     sindicato: "",
     valorHoraNormal: "",
     fechaIngreso: "",
-    obra: "",
+    sector: "",
+    horasTeoricasDiarias: "",
   });
   const [importResult, setImportResult] = useState<{ creados: number; actualizados: number; errores: string[] } | null>(null);
+
+  function guessMapping(headers: string[]) {
+    const guess = (needle: string) => headers.find((h) => h.toLowerCase().includes(needle)) ?? "";
+    return {
+      legajo: guess("legajo"),
+      nombre: guess("nombre"),
+      apellido: guess("apellido"),
+      sindicato: guess("sindicato"),
+      valorHoraNormal: guess("hora"),
+      fechaIngreso: guess("ingreso"),
+      sector: guess("sector"),
+      horasTeoricasDiarias: guess("teoric"),
+    };
+  }
 
   const previewMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -104,16 +142,7 @@ export default function Empleados() {
     onSuccess: (data) => {
       setPreview(data);
       setImportResult(null);
-      const guess = (needle: string) => data.headers.find((h) => h.toLowerCase().includes(needle)) ?? "";
-      setMapping({
-        legajo: guess("legajo"),
-        nombre: guess("nombre"),
-        apellido: guess("apellido"),
-        sindicato: guess("sindicato"),
-        valorHoraNormal: guess("hora"),
-        fechaIngreso: guess("ingreso"),
-        obra: guess("obra"),
-      });
+      setMapping(guessMapping(data.headers));
     },
   });
 
@@ -125,16 +154,7 @@ export default function Empleados() {
       >,
     onSuccess: (data) => {
       setPreview((p) => (p ? { ...p, ...data } : p));
-      const guess = (needle: string) => data.headers.find((h) => h.toLowerCase().includes(needle)) ?? "";
-      setMapping({
-        legajo: guess("legajo"),
-        nombre: guess("nombre"),
-        apellido: guess("apellido"),
-        sindicato: guess("sindicato"),
-        valorHoraNormal: guess("hora"),
-        fechaIngreso: guess("ingreso"),
-        obra: guess("obra"),
-      });
+      setMapping(guessMapping(data.headers));
     },
   });
 
@@ -161,29 +181,47 @@ export default function Empleados() {
             <input type="checkbox" checked={mostrarInactivos} onChange={(e) => setMostrarInactivos(e.target.checked)} />
             Mostrar inactivos
           </label>
-        {isAdmin && (
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                setShowImport((v) => !v);
-                setShowForm(false);
-              }}
-              className="bg-white border border-slate-300 text-slate-700 text-sm px-4 py-2 rounded-md hover:bg-slate-50"
-            >
-              {showImport ? "Cancelar" : "Importar planilla"}
-            </button>
-            <button
-              onClick={() => {
-                setShowForm((v) => !v);
-                setShowImport(false);
-              }}
-              className="bg-slate-900 text-white text-sm px-4 py-2 rounded-md hover:bg-slate-800"
-            >
-              {showForm ? "Cancelar" : "+ Nuevo empleado"}
-            </button>
-          </div>
-        )}
+          {isAdmin && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setShowImport((v) => !v);
+                  setShowForm(false);
+                }}
+                className="bg-white border border-slate-300 text-slate-700 text-sm px-4 py-2 rounded-md hover:bg-slate-50"
+              >
+                {showImport ? "Cancelar" : "Importar planilla"}
+              </button>
+              <button
+                onClick={() => {
+                  setShowForm((v) => !v);
+                  setShowImport(false);
+                }}
+                className="bg-slate-900 text-white text-sm px-4 py-2 rounded-md hover:bg-slate-800"
+              >
+                {showForm ? "Cancelar" : "+ Nuevo empleado"}
+              </button>
+            </div>
+          )}
         </div>
+      </div>
+
+      <div className="relative mb-6 max-w-sm">
+        <svg
+          className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <input
+          type="text"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder="Buscar por legajo o nombre..."
+          className="w-full border border-slate-300 rounded-md pl-9 pr-3 py-2 text-sm"
+        />
       </div>
 
       {showImport && (
@@ -191,7 +229,8 @@ export default function Empleados() {
           <h2 className="font-medium text-slate-700 mb-1">Importar planilla de empleados</h2>
           <p className="text-sm text-slate-500 mb-3">
             Subí un Excel/CSV con una fila por empleado. Columnas necesarias: Legajo, Nombre, Apellido y Valor hora
-            normal. Sindicato y Obra son opcionales. Si el legajo ya existe, se actualizan sus datos.
+            normal. Sindicato, Sector y horas teóricas diarias son opcionales. Si el legajo ya existe, se actualizan
+            sus datos.
           </p>
           <input
             type="file"
@@ -344,16 +383,27 @@ export default function Empleados() {
             />
           </div>
           <div>
-            <label className="block text-sm text-slate-600 mb-1">Obra</label>
+            <label className="block text-sm text-slate-600 mb-1">Horas teóricas diarias</label>
+            <input
+              type="number"
+              step="0.5"
+              required
+              value={form.horasTeoricasDiarias}
+              onChange={(e) => setForm({ ...form, horasTeoricasDiarias: e.target.value })}
+              className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-slate-600 mb-1">Sector</label>
             <select
-              value={form.obraId}
-              onChange={(e) => setForm({ ...form, obraId: e.target.value })}
+              value={form.sectorId}
+              onChange={(e) => setForm({ ...form, sectorId: e.target.value })}
               className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
             >
               <option value="">Sin asignar</option>
-              {obras?.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.nombre}
+              {sectores?.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nombre}
                 </option>
               ))}
             </select>
@@ -376,13 +426,14 @@ export default function Empleados() {
                 <th className="pb-2">Legajo</th>
                 <th className="pb-2">Nombre</th>
                 <th className="pb-2">Sindicato</th>
-                <th className="pb-2">Obra</th>
+                <th className="pb-2">Empresa</th>
+                <th className="pb-2">Sector</th>
                 <th className="pb-2">Valor hora</th>
                 <th className="pb-2">Ingreso</th>
               </tr>
             </thead>
             <tbody>
-              {empleados?.map((e) => (
+              {empleadosFiltrados?.map((e) => (
                 <tr key={e.id} className={`border-b last:border-0 ${!e.activo ? "opacity-50" : ""}`}>
                   <td className="py-2">{e.legajo}</td>
                   <td className="py-2">
@@ -392,11 +443,19 @@ export default function Empleados() {
                     {!e.activo && <span className="ml-2 text-xs text-red-600">(inactivo)</span>}
                   </td>
                   <td className="py-2">{e.sindicato ?? "-"}</td>
-                  <td className="py-2">{e.obra?.nombre ?? "-"}</td>
+                  <td className="py-2">{e.sector?.empresa?.nombre ?? "-"}</td>
+                  <td className="py-2">{e.sector?.nombre ?? "-"}</td>
                   <td className="py-2">${e.valorHoraNormal.toLocaleString("es-AR")}</td>
                   <td className="py-2">{new Date(e.fechaIngreso).toLocaleDateString("es-AR", { timeZone: "UTC" })}</td>
                 </tr>
               ))}
+              {empleadosFiltrados?.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-4 text-center text-slate-400">
+                    No se encontraron empleados
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         )}

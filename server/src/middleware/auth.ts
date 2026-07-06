@@ -9,7 +9,7 @@ export interface AuthUser {
   email: string;
   nombre: string;
   role: "ADMIN" | "ENCARGADO";
-  obraIds: string[];
+  sectorIds: string[];
 }
 
 declare global {
@@ -35,7 +35,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     const payload = jwt.verify(token, JWT_SECRET) as { sub: string };
     const user = await prisma.user.findUnique({
       where: { id: payload.sub },
-      include: { obras: true },
+      include: { sectores: true },
     });
     if (!user || !user.activo) {
       return res.status(401).json({ error: "No autenticado" });
@@ -45,7 +45,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       email: user.email,
       nombre: user.nombre,
       role: user.role,
-      obraIds: user.obras.map((o) => o.obraId),
+      sectorIds: user.sectores.map((s) => s.sectorId),
     };
     next();
   } catch {
@@ -60,8 +60,8 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-/** Para ENCARGADO: fuerza a filtrar por sus obras asignadas. ADMIN no tiene restricción (retorna null = sin filtro). */
-export function obraScope(req: Request): string[] | null {
+/** Para ENCARGADO: fuerza a filtrar por sus sectores asignados. ADMIN no tiene restricción (retorna null = sin filtro). */
+export function sectorScope(req: Request): string[] | null {
   if (req.user?.role === "ADMIN") return null;
-  return req.user?.obraIds ?? [];
+  return req.user?.sectorIds ?? [];
 }

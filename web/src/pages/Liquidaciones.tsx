@@ -35,9 +35,21 @@ export default function Liquidaciones() {
     fechaHasta: today(),
   });
 
+  const [avisoSinValidar, setAvisoSinValidar] = useState<string | null>(null);
   const generar = useMutation({
-    mutationFn: async () => api.post("/liquidaciones/generar", form),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["liquidaciones"] }),
+    mutationFn: async () => (await api.post("/liquidaciones/generar", form)).data,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["liquidaciones"] });
+      if (data.diasSinValidarCount > 0) {
+        setAvisoSinValidar(
+          `Ojo: quedaron ${data.horasExtra50SinValidar.toFixed(1)}hs extra 50% y ${data.horasExtra100SinValidar.toFixed(
+            1
+          )}hs extra 100% sin validar en ${data.diasSinValidarCount} día(s) — no se incluyeron en esta liquidación. Validalas desde la ficha del empleado y generá la liquidación de nuevo si corresponde.`
+        );
+      } else {
+        setAvisoSinValidar(null);
+      }
+    },
   });
 
   async function exportar(id: string) {
@@ -117,6 +129,7 @@ export default function Liquidaciones() {
           </button>
         </form>
         {generar.isError && <p className="text-red-600 text-sm mt-2">No se pudo generar la liquidación</p>}
+        {avisoSinValidar && <p className="text-amber-600 text-sm mt-2">{avisoSinValidar}</p>}
       </div>
 
       <div className="bg-white rounded-lg shadow-sm p-5">

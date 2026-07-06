@@ -21,7 +21,7 @@ Si ya tenías el repo clonado y solo estás levantando la app de nuevo, alcanza 
 ## Usuarios de prueba (creados por el seed)
 
 - Admin/RRHH: `admin@empresa.com` / `admin123`
-- Encargado de obra: `encargado@empresa.com` / `encargado123`
+- Encargado de sector: `encargado@empresa.com` / `encargado123`
 
 Cambiá estas contraseñas antes de usar la app con datos reales (desde `/configuracion` como admin, o directamente en la base).
 
@@ -44,6 +44,18 @@ Se pueden cargar de dos formas:
 ## Importar fichadas del reloj
 
 El importador soporta el formato con columna "Marcaciones" combinada (ej. `E 08:07 - S 15:56`) y detecta automáticamente los turnos que cruzan la medianoche: si un día queda con una entrada sin cierre, prueba emparejarla con la primera marca del día siguiente y, si la duración resultante es razonable para un turno (2 a 14 horas), la toma como la salida real. Si no encuentra un cierre plausible, la deja marcada para revisión manual en el resumen de la importación.
+
+## Empresas y sectores
+
+Los empleados se agrupan por Empresa (ej. POLCECAL, POLYSAN) y Sector (ej. Francisco, Administración) — se gestionan desde Configuración. Los encargados de sector solo ven y operan sobre los empleados de sus sectores asignados.
+
+## Validación de horas extra
+
+Cada empleado tiene una pestaña "fichadas" con el detalle día por día: horas trabajadas, extra 50%, extra 100%, y si trabajó un domingo/feriado. Las horas extra requieren que RRHH las valide (botón verde "Validar") antes de que se incluyan en una liquidación — si generás una liquidación con horas extra sin validar, quedan afuera y se avisa en pantalla.
+
+## Horas teóricas
+
+Cada empleado tiene un campo "horas teóricas diarias" (default 8, ajustable a 4 para pasantes u otros esquemas reducidos). Se usa para comparar horas trabajadas vs. teóricas por sector en el Dashboard.
 
 ## Restablecer la base de datos con datos de ejemplo
 

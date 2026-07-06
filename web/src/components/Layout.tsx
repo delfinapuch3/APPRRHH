@@ -40,7 +40,7 @@ export function Layout() {
         </nav>
         <div className="p-4 border-t border-slate-700 text-sm">
           <div className="font-medium">{user?.nombre}</div>
-          <div className="text-slate-400">{user?.role === "ADMIN" ? "Administrador" : "Encargado de obra"}</div>
+          <div className="text-slate-400">{user?.role === "ADMIN" ? "Administrador" : "Encargado de sector"}</div>
           <button onClick={logout} className="mt-2 text-slate-400 hover:text-white underline">
             Cerrar sesión
           </button>

@@ -69,29 +69,40 @@ model User {
   role         Role       @default(ENCARGADO)
   activo       Boolean    @default(true)
   createdAt    DateTime   @default(now())
-  obras        UserObra[]
+  sectores     UserSector[]
   importBatches ImportBatch[]
   ausenciasCargadas Absence[]
   liquidacionesGeneradas PayrollPeriod[]
+  extrasValidadas DailyCalculation[] @relation("ExtrasValidadasPor")
 }
 
-model Obra {
+model Empresa {
+  id        String   @id @default(cuid())
+  nombre    String   @unique
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  sectores  Sector[]
+}
+
+model Sector {
   id        String     @id @default(cuid())
   nombre    String
   activo    Boolean    @default(true)
   createdAt DateTime   @default(now())
+  empresaId String?
+  empresa   Empresa?   @relation(fields: [empresaId], references: [id])
   empleados Employee[]
-  encargados UserObra[]
+  encargados UserSector[]
 }
 
-model UserObra {
-  id     String @id @default(cuid())
-  userId String
-  obraId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  obra   Obra   @relation(fields: [obraId], references: [id], onDelete: Cascade)
+model UserSector {
+  id       String @id @default(cuid())
+  userId   String
+  sectorId String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sector   Sector @relation(fields: [sectorId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, obraId])
+  @@unique([userId, sectorId])
 }
 
 model Employee {
@@ -102,12 +113,13 @@ model Employee {
   sindicato                String?
   fechaIngreso             DateTime
   valorHoraNormal          Float
-  obraId                   String?
+  horasTeoricasDiarias     Float    @default(8)
+  sectorId                 String?
   activo                   Boolean  @default(true)
   escalaVacacionesOverride String?
   createdAt                DateTime @default(now())
 
-  obra              Obra?               @relation(fields: [obraId], references: [id])
+  sector            Sector?             @relation(fields: [sectorId], references: [id])
   fichadas          TimeRecord[]
   calculosDiarios   DailyCalculation[]
   ausencias         Absence[]
@@ -165,21 +177,25 @@ model PayrollConfig {
 }
 
 model DailyCalculation {
-  id             String        @id @default(cuid())
-  employeeId     String
-  fecha          DateTime
-  tipoDia        TipoDia
-  horasNormales  Float         @default(0)
-  horasExtra50   Float         @default(0)
-  horasExtra100  Float         @default(0)
-  francoGenerado Boolean       @default(false)
-  ausente        Boolean       @default(false)
-  justificada    Boolean?
-  tipoAusencia   TipoAusencia?
-  observaciones  String?
-  updatedAt      DateTime      @updatedAt
+  id              String        @id @default(cuid())
+  employeeId      String
+  fecha           DateTime
+  tipoDia         TipoDia
+  horasNormales   Float         @default(0)
+  horasExtra50    Float         @default(0)
+  horasExtra100   Float         @default(0)
+  francoGenerado  Boolean       @default(false)
+  ausente         Boolean       @default(false)
+  justificada     Boolean?
+  tipoAusencia    TipoAusencia?
+  observaciones   String?
+  extrasValidadas Boolean       @default(false)
+  validadoPorId   String?
+  fechaValidacion DateTime?
+  updatedAt       DateTime      @updatedAt
 
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  validadoPor User?    @relation("ExtrasValidadasPor", fields: [validadoPorId], references: [id])
 
   @@unique([employeeId, fecha])
   @@index([fecha])

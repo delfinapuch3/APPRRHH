@@ -51,8 +51,15 @@ router.post("/generar", async (req, res) => {
   const config = await prisma.payrollConfig.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
 
   const horasNormales = dias.reduce((a, d) => a + d.horasNormales, 0);
-  const horasExtra50 = dias.reduce((a, d) => a + d.horasExtra50, 0);
-  const horasExtra100 = dias.reduce((a, d) => a + d.horasExtra100, 0);
+  // Las horas extra solo cuentan para la liquidación una vez que RRHH las validó
+  // día por día; las que quedan pendientes se informan aparte para que se sepa
+  // que faltan validar (no se pagan solas por default).
+  const diasValidados = dias.filter((d) => d.extrasValidadas);
+  const diasSinValidar = dias.filter((d) => !d.extrasValidadas && (d.horasExtra50 > 0 || d.horasExtra100 > 0));
+  const horasExtra50 = diasValidados.reduce((a, d) => a + d.horasExtra50, 0);
+  const horasExtra100 = diasValidados.reduce((a, d) => a + d.horasExtra100, 0);
+  const horasExtra50SinValidar = diasSinValidar.reduce((a, d) => a + d.horasExtra50, 0);
+  const horasExtra100SinValidar = diasSinValidar.reduce((a, d) => a + d.horasExtra100, 0);
 
   const montoNormal = horasNormales * empleado.valorHoraNormal;
   const montoExtra50 = horasExtra50 * empleado.valorHoraNormal * config.multiplicadorExtra50;
@@ -93,7 +100,12 @@ router.post("/generar", async (req, res) => {
     });
   }
 
-  res.status(201).json(liquidacion);
+  res.status(201).json({
+    ...liquidacion,
+    horasExtra50SinValidar,
+    horasExtra100SinValidar,
+    diasSinValidarCount: diasSinValidar.length,
+  });
 });
 
 router.put("/:id/cerrar", async (req, res) => {

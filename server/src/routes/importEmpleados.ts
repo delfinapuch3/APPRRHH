@@ -11,7 +11,7 @@ const router = Router();
 router.use(requireAdmin);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-const KEYWORDS = ["legajo", "nombre", "apellido", "hora", "sindicato"];
+const KEYWORDS = ["legajo", "nombre", "apellido", "hora", "sindicato", "sector"];
 
 interface CachedImport {
   sheetNames: string[];
@@ -73,7 +73,8 @@ const confirmSchema = z.object({
     valorHoraNormal: z.string(),
     fechaIngreso: z.string().optional(),
     sindicato: z.string().optional(),
-    obra: z.string().optional(),
+    sector: z.string().optional(),
+    horasTeoricasDiarias: z.string().optional(),
   }),
 });
 
@@ -86,8 +87,8 @@ router.post("/confirm", async (req, res) => {
   const hoja = entry.sheets[sheet];
   if (!hoja) return res.status(400).json({ error: "Esa hoja no existe en el archivo" });
 
-  const obras = await prisma.obra.findMany();
-  const obraByNombre = new Map(obras.map((o) => [o.nombre.trim().toLowerCase(), o.id]));
+  const sectores = await prisma.sector.findMany();
+  const sectorByNombre = new Map(sectores.map((s) => [s.nombre.trim().toLowerCase(), s.id]));
   const hoy = utcDateOnlyFrom(new Date());
 
   const errores: string[] = [];
@@ -119,20 +120,34 @@ router.post("/confirm", async (req, res) => {
 
     const sindicato = mapping.sindicato ? String(row[mapping.sindicato] ?? "").trim() || null : null;
 
-    let obraId: string | null = null;
-    if (mapping.obra) {
-      const obraNombre = String(row[mapping.obra] ?? "").trim();
-      if (obraNombre) {
-        const match = obraByNombre.get(obraNombre.toLowerCase());
+    let sectorId: string | null = null;
+    if (mapping.sector) {
+      const sectorNombre = String(row[mapping.sector] ?? "").trim();
+      if (sectorNombre) {
+        const match = sectorByNombre.get(sectorNombre.toLowerCase());
         if (match) {
-          obraId = match;
+          sectorId = match;
         } else {
-          errores.push(`Fila ${idx + 2}: obra "${obraNombre}" no encontrada, se dejó sin asignar`);
+          errores.push(`Fila ${idx + 2}: sector "${sectorNombre}" no encontrado, se dejó sin asignar`);
         }
       }
     }
 
-    const data = { nombre, apellido, sindicato, valorHoraNormal, fechaIngreso, ...(obraId ? { obraId } : {}) };
+    let horasTeoricasDiarias: number | undefined;
+    if (mapping.horasTeoricasDiarias) {
+      const parsedHoras = parseNumeroAR(row[mapping.horasTeoricasDiarias]);
+      if (parsedHoras !== null && parsedHoras > 0) horasTeoricasDiarias = parsedHoras;
+    }
+
+    const data = {
+      nombre,
+      apellido,
+      sindicato,
+      valorHoraNormal,
+      fechaIngreso,
+      ...(sectorId ? { sectorId } : {}),
+      ...(horasTeoricasDiarias !== undefined ? { horasTeoricasDiarias } : {}),
+    };
     const existente = await prisma.employee.findUnique({ where: { legajo } });
     if (existente) {
       await prisma.employee.update({ where: { legajo }, data });

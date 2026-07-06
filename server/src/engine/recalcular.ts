@@ -86,6 +86,11 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
 
   const feriadosSet = new Set(feriados.map((f) => startOfDay(f.fecha).getTime()));
 
+  const existentes = await prisma.dailyCalculation.findMany({
+    where: { employeeId, fecha: { gte: startOfDay(desde), lte: startOfDay(hasta) } },
+  });
+  const existentePorFecha = new Map(existentes.map((e) => [e.fecha.getTime(), e]));
+
   const dias = eachDay(desde, hasta);
   const results: {
     fecha: Date;
@@ -156,8 +161,15 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
   }
 
   await prisma.$transaction(
-    results.map((r) =>
-      prisma.dailyCalculation.upsert({
+    results.map((r) => {
+      const existente = existentePorFecha.get(r.fecha.getTime());
+      const preservarValidacion =
+        existente?.extrasValidadas && existente.horasExtra50 === r.horasExtra50 && existente.horasExtra100 === r.horasExtra100;
+      const resetValidacion = preservarValidacion
+        ? {}
+        : { extrasValidadas: false, validadoPorId: null, fechaValidacion: null };
+
+      return prisma.dailyCalculation.upsert({
         where: { employeeId_fecha: { employeeId, fecha: r.fecha } },
         update: {
           tipoDia: r.tipoDia as never,
@@ -169,6 +181,7 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
           justificada: r.justificada,
           tipoAusencia: r.tipoAusencia as never,
           observaciones: r.observaciones,
+          ...resetValidacion,
         },
         create: {
           employeeId,
@@ -183,8 +196,8 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
           tipoAusencia: r.tipoAusencia as never,
           observaciones: r.observaciones,
         },
-      })
-    )
+      });
+    })
   );
 
   // Genera registros de franco compensatorio para los días que corresponda
@@ -208,9 +221,9 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
   return results;
 }
 
-export async function recalcularObraPeriodo(obraId: string | null, desde: Date, hasta: Date) {
+export async function recalcularSectorPeriodo(sectorId: string | null, desde: Date, hasta: Date) {
   const empleados = await prisma.employee.findMany({
-    where: obraId ? { obraId, activo: true } : { activo: true },
+    where: sectorId ? { sectorId, activo: true } : { activo: true },
     select: { id: true },
   });
   for (const e of empleados) {

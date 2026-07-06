@@ -18,9 +18,14 @@ export default function Configuracion() {
     queryKey: ["configuracion"],
     queryFn: async () => (await api.get("/configuracion")).data as Config,
   });
-  const { data: obras } = useQuery({
-    queryKey: ["obras"],
-    queryFn: async () => (await api.get("/obras")).data as { id: string; nombre: string }[],
+  const { data: empresas } = useQuery({
+    queryKey: ["empresas"],
+    queryFn: async () => (await api.get("/empresas")).data as { id: string; nombre: string }[],
+  });
+  const { data: sectores } = useQuery({
+    queryKey: ["sectores"],
+    queryFn: async () =>
+      (await api.get("/sectores")).data as { id: string; nombre: string; empresa: { nombre: string } | null }[],
   });
   const { data: feriados } = useQuery({
     queryKey: ["feriados"],
@@ -37,12 +42,21 @@ export default function Configuracion() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["configuracion"] }),
   });
 
-  const [nuevaObra, setNuevaObra] = useState("");
-  const crearObra = useMutation({
-    mutationFn: async () => api.post("/obras", { nombre: nuevaObra }),
+  const [nuevaEmpresa, setNuevaEmpresa] = useState("");
+  const crearEmpresa = useMutation({
+    mutationFn: async () => api.post("/empresas", { nombre: nuevaEmpresa }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["obras"] });
-      setNuevaObra("");
+      queryClient.invalidateQueries({ queryKey: ["empresas"] });
+      setNuevaEmpresa("");
+    },
+  });
+
+  const [nuevoSector, setNuevoSector] = useState({ nombre: "", empresaId: "" });
+  const crearSector = useMutation({
+    mutationFn: async () => api.post("/sectores", nuevoSector),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sectores"] });
+      setNuevoSector({ nombre: "", empresaId: "" });
     },
   });
 
@@ -163,30 +177,70 @@ export default function Configuracion() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-3 gap-6 mb-6">
         <div className="bg-white rounded-lg shadow-sm p-5">
-          <h2 className="font-medium text-slate-700 mb-3">Obras</h2>
+          <h2 className="font-medium text-slate-700 mb-3">Empresas</h2>
           <ul className="text-sm mb-3 space-y-1">
-            {obras?.map((o) => (
-              <li key={o.id} className="text-slate-600">
-                {o.nombre}
+            {empresas?.map((emp) => (
+              <li key={emp.id} className="text-slate-600">
+                {emp.nombre}
               </li>
             ))}
           </ul>
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              crearObra.mutate();
+              crearEmpresa.mutate();
             }}
             className="flex gap-2"
           >
             <input
-              value={nuevaObra}
-              onChange={(e) => setNuevaObra(e.target.value)}
-              placeholder="Nombre de la obra"
+              value={nuevaEmpresa}
+              onChange={(e) => setNuevaEmpresa(e.target.value)}
+              placeholder="Nombre de la empresa"
               className="flex-1 border border-slate-300 rounded-md px-2 py-1.5 text-sm"
             />
             <button type="submit" className="bg-slate-900 text-white text-sm px-3 py-1.5 rounded-md">
+              Agregar
+            </button>
+          </form>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm p-5">
+          <h2 className="font-medium text-slate-700 mb-3">Sectores</h2>
+          <ul className="text-sm mb-3 space-y-1">
+            {sectores?.map((s) => (
+              <li key={s.id} className="text-slate-600">
+                {s.nombre} {s.empresa ? `(${s.empresa.nombre})` : ""}
+              </li>
+            ))}
+          </ul>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              crearSector.mutate();
+            }}
+            className="space-y-2"
+          >
+            <input
+              value={nuevoSector.nombre}
+              onChange={(e) => setNuevoSector({ ...nuevoSector, nombre: e.target.value })}
+              placeholder="Nombre del sector"
+              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+            />
+            <select
+              value={nuevoSector.empresaId}
+              onChange={(e) => setNuevoSector({ ...nuevoSector, empresaId: e.target.value })}
+              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+            >
+              <option value="">Sin empresa</option>
+              {empresas?.map((emp) => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.nombre}
+                </option>
+              ))}
+            </select>
+            <button type="submit" className="bg-slate-900 text-white text-sm px-3 py-1.5 rounded-md w-full">
               Agregar
             </button>
           </form>

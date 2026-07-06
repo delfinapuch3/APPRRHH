@@ -1,17 +1,17 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
-import { obraScope } from "../middleware/auth.js";
+import { sectorScope } from "../middleware/auth.js";
 import { recalcularEmpleadoPeriodo } from "../engine/recalcular.js";
 
 const router = Router();
 
 router.get("/", async (req, res) => {
-  const scope = obraScope(req);
+  const scope = sectorScope(req);
   const { employeeId } = req.query as Record<string, string | undefined>;
   const where: Record<string, unknown> = {};
   if (employeeId) where.employeeId = employeeId;
-  if (scope) where.employee = { obraId: { in: scope } };
+  if (scope) where.employee = { sectorId: { in: scope } };
   const ausencias = await prisma.absence.findMany({
     where,
     include: { employee: true, cargadoPor: { select: { nombre: true } } },

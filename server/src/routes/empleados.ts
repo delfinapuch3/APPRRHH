@@ -1,32 +1,32 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
-import { obraScope, requireAdmin } from "../middleware/auth.js";
+import { sectorScope, requireAdmin } from "../middleware/auth.js";
 
 const router = Router();
 
 router.get("/", async (req, res) => {
-  const scope = obraScope(req);
+  const scope = sectorScope(req);
   const { activo } = req.query as Record<string, string | undefined>;
   const empleados = await prisma.employee.findMany({
     where: {
-      ...(scope ? { obraId: { in: scope } } : {}),
+      ...(scope ? { sectorId: { in: scope } } : {}),
       ...(activo === "true" ? { activo: true } : activo === "false" ? { activo: false } : {}),
     },
-    include: { obra: true },
+    include: { sector: { include: { empresa: true } } },
     orderBy: [{ apellido: "asc" }, { nombre: "asc" }],
   });
   res.json(empleados);
 });
 
 router.get("/:id", async (req, res) => {
-  const scope = obraScope(req);
+  const scope = sectorScope(req);
   const empleado = await prisma.employee.findUnique({
     where: { id: req.params.id },
-    include: { obra: true },
+    include: { sector: { include: { empresa: true } } },
   });
   if (!empleado) return res.status(404).json({ error: "No encontrado" });
-  if (scope && (!empleado.obraId || !scope.includes(empleado.obraId))) {
+  if (scope && (!empleado.sectorId || !scope.includes(empleado.sectorId))) {
     return res.status(403).json({ error: "Sin acceso a este empleado" });
   }
   res.json(empleado);
@@ -39,7 +39,8 @@ const empleadoSchema = z.object({
   sindicato: z.string().nullable().optional(),
   fechaIngreso: z.coerce.date(),
   valorHoraNormal: z.number().positive(),
-  obraId: z.string().nullable().optional(),
+  horasTeoricasDiarias: z.number().positive().optional(),
+  sectorId: z.string().nullable().optional(),
   activo: z.boolean().optional(),
 });
 

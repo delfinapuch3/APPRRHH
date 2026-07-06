@@ -13,18 +13,47 @@ interface Empleado {
   sindicato: string | null;
   fechaIngreso: string;
   valorHoraNormal: number;
+  horasTeoricasDiarias: number;
   activo: boolean;
-  obraId: string | null;
-  obra: { nombre: string } | null;
+  sectorId: string | null;
+  sector: { nombre: string; empresa: { nombre: string } | null } | null;
 }
 
-interface Obra {
+interface Sector {
   id: string;
   nombre: string;
 }
 
+interface Fichada {
+  id: string;
+  horaEntrada: string;
+  horaSalida: string | null;
+}
+
+interface DiaResumen {
+  fecha: string;
+  tipoDia: string;
+  horasNormales: number;
+  horasExtra50: number;
+  horasExtra100: number;
+  ausente: boolean;
+  extrasValidadas: boolean;
+  fichadas: Fichada[];
+}
+
 const tabs = ["fichadas", "ausencias", "vacaciones", "francos"] as const;
 type Tab = (typeof tabs)[number];
+
+function firstOfMonth() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+function formatHora(iso: string) {
+  return new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+}
 
 export default function EmpleadoDetalle() {
   const { id } = useParams<{ id: string }>();
@@ -34,20 +63,22 @@ export default function EmpleadoDetalle() {
   const [tab, setTab] = useState<Tab>("fichadas");
   const [editando, setEditando] = useState(false);
   const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
+  const [desde, setDesde] = useState(firstOfMonth());
+  const [hasta, setHasta] = useState(today());
 
   const { data: empleado } = useQuery({
     queryKey: ["empleado", id],
     queryFn: async () => (await api.get(`/empleados/${id}`)).data as Empleado,
   });
-  const { data: obras } = useQuery({
-    queryKey: ["obras"],
-    queryFn: async () => (await api.get("/obras")).data as Obra[],
+  const { data: sectores } = useQuery({
+    queryKey: ["sectores"],
+    queryFn: async () => (await api.get("/sectores")).data as Sector[],
     enabled: isAdmin,
   });
 
-  const { data: fichadas } = useQuery({
-    queryKey: ["fichadas", id],
-    queryFn: async () => (await api.get(`/fichadas?employeeId=${id}`)).data as any[],
+  const { data: dias, isLoading: cargandoDias } = useQuery({
+    queryKey: ["asistencia-empleado", id, desde, hasta],
+    queryFn: async () => (await api.get(`/asistencia/empleado/${id}?desde=${desde}&hasta=${hasta}`)).data as DiaResumen[],
     enabled: tab === "fichadas",
   });
   const { data: ausencias } = useQuery({
@@ -66,6 +97,11 @@ export default function EmpleadoDetalle() {
     enabled: tab === "francos",
   });
 
+  const validar = useMutation({
+    mutationFn: async (fecha: string) => api.put("/asistencia/validar", { employeeId: id, fecha }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["asistencia-empleado", id] }),
+  });
+
   // --- edición ---
   const [form, setForm] = useState({
     nombre: "",
@@ -73,7 +109,8 @@ export default function EmpleadoDetalle() {
     sindicato: "",
     fechaIngreso: "",
     valorHoraNormal: "",
-    obraId: "",
+    horasTeoricasDiarias: "",
+    sectorId: "",
   });
   useEffect(() => {
     if (empleado) {
@@ -83,7 +120,8 @@ export default function EmpleadoDetalle() {
         sindicato: empleado.sindicato ?? "",
         fechaIngreso: empleado.fechaIngreso.slice(0, 10),
         valorHoraNormal: String(empleado.valorHoraNormal),
-        obraId: empleado.obraId ?? "",
+        horasTeoricasDiarias: String(empleado.horasTeoricasDiarias),
+        sectorId: empleado.sectorId ?? "",
       });
     }
   }, [empleado]);
@@ -94,7 +132,8 @@ export default function EmpleadoDetalle() {
         ...form,
         sindicato: form.sindicato || null,
         valorHoraNormal: Number(form.valorHoraNormal),
-        obraId: form.obraId || null,
+        horasTeoricasDiarias: Number(form.horasTeoricasDiarias),
+        sectorId: form.sectorId || null,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["empleado", id] });
@@ -184,9 +223,9 @@ export default function EmpleadoDetalle() {
         )}
       </div>
       <p className="text-slate-500 mb-4">
-        Legajo {empleado.legajo} · {empleado.obra?.nombre ?? "Sin obra"}
+        Legajo {empleado.legajo} · {empleado.sector?.empresa?.nombre ?? "Sin empresa"} · {empleado.sector?.nombre ?? "Sin sector"}
         {empleado.sindicato ? ` · ${empleado.sindicato}` : ""} · $
-        {empleado.valorHoraNormal.toLocaleString("es-AR")}/hora
+        {empleado.valorHoraNormal.toLocaleString("es-AR")}/hora · {empleado.horasTeoricasDiarias}hs teóricas/día
       </p>
       {errorEliminar && <p className="text-sm text-red-600 mb-4">{errorEliminar}</p>}
 
@@ -246,16 +285,27 @@ export default function EmpleadoDetalle() {
             />
           </div>
           <div>
-            <label className="block text-sm text-slate-600 mb-1">Obra</label>
+            <label className="block text-sm text-slate-600 mb-1">Horas teóricas diarias</label>
+            <input
+              type="number"
+              step="0.5"
+              required
+              value={form.horasTeoricasDiarias}
+              onChange={(e) => setForm({ ...form, horasTeoricasDiarias: e.target.value })}
+              className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-slate-600 mb-1">Sector</label>
             <select
-              value={form.obraId}
-              onChange={(e) => setForm({ ...form, obraId: e.target.value })}
+              value={form.sectorId}
+              onChange={(e) => setForm({ ...form, sectorId: e.target.value })}
               className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
             >
               <option value="">Sin asignar</option>
-              {obras?.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.nombre}
+              {sectores?.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nombre}
                 </option>
               ))}
             </select>
@@ -284,28 +334,93 @@ export default function EmpleadoDetalle() {
 
       <div className="bg-white rounded-lg shadow-sm p-5">
         {tab === "fichadas" && (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-slate-500 border-b">
-                <th className="pb-2">Fecha</th>
-                <th className="pb-2">Entrada</th>
-                <th className="pb-2">Salida</th>
-                <th className="pb-2">Origen</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fichadas?.map((f) => (
-                <tr key={f.id} className="border-b last:border-0">
-                  <td className="py-2">{new Date(f.fecha).toLocaleDateString("es-AR", { timeZone: "UTC" })}</td>
-                  <td className="py-2">{new Date(f.horaEntrada).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</td>
-                  <td className="py-2">
-                    {f.horaSalida ? new Date(f.horaSalida).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) : "-"}
-                  </td>
-                  <td className="py-2">{f.origen}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div>
+            <div className="flex gap-3 items-end mb-4">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Desde</label>
+                <input
+                  type="date"
+                  value={desde}
+                  onChange={(e) => setDesde(e.target.value)}
+                  className="border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Hasta</label>
+                <input
+                  type="date"
+                  value={hasta}
+                  onChange={(e) => setHasta(e.target.value)}
+                  className="border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+                />
+              </div>
+            </div>
+            {cargandoDias ? (
+              <p className="text-slate-500 text-sm">Cargando...</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-slate-500 border-b">
+                    <th className="pb-2">Fecha</th>
+                    <th className="pb-2">Marcaciones</th>
+                    <th className="pb-2">Hs. trabajadas</th>
+                    <th className="pb-2">Extra 50%</th>
+                    <th className="pb-2">Extra 100%</th>
+                    <th className="pb-2">Día</th>
+                    <th className="pb-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dias
+                    ?.filter((d) => d.fichadas.length > 0 || d.horasNormales + d.horasExtra50 + d.horasExtra100 > 0)
+                    .map((d) => {
+                      const horasTrabajadas = d.horasNormales + d.horasExtra50 + d.horasExtra100;
+                      const tieneExtras = d.horasExtra50 > 0 || d.horasExtra100 > 0;
+                      const esDomingoOFeriado = d.tipoDia === "DOMINGO" || d.tipoDia === "FERIADO";
+                      return (
+                        <tr key={d.fecha} className="border-b last:border-0">
+                          <td className="py-2">{new Date(d.fecha).toLocaleDateString("es-AR", { timeZone: "UTC" })}</td>
+                          <td className="py-2">
+                            {d.fichadas.map((f, i) => (
+                              <span key={f.id} className="mr-2 whitespace-nowrap">
+                                {formatHora(f.horaEntrada)}-{f.horaSalida ? formatHora(f.horaSalida) : "?"}
+                                {i < d.fichadas.length - 1 ? "," : ""}
+                              </span>
+                            ))}
+                          </td>
+                          <td className="py-2">{horasTrabajadas.toFixed(1)}</td>
+                          <td className="py-2">{d.horasExtra50 > 0 ? d.horasExtra50.toFixed(1) : "-"}</td>
+                          <td className="py-2">{d.horasExtra100 > 0 ? d.horasExtra100.toFixed(1) : "-"}</td>
+                          <td className="py-2">
+                            {esDomingoOFeriado ? (
+                              <span className="text-purple-700">
+                                {d.tipoDia === "DOMINGO" ? "Domingo" : "Feriado"} ({horasTrabajadas.toFixed(1)}hs)
+                              </span>
+                            ) : (
+                              d.tipoDia
+                            )}
+                          </td>
+                          <td className="py-2 text-right">
+                            {tieneExtras &&
+                              (d.extrasValidadas ? (
+                                <span className="text-emerald-700 text-xs">✓ Validado</span>
+                              ) : (
+                                <button
+                                  onClick={() => validar.mutate(d.fecha)}
+                                  disabled={validar.isPending}
+                                  className="bg-emerald-600 text-white text-xs px-3 py-1.5 rounded-md hover:bg-emerald-700 disabled:opacity-50"
+                                >
+                                  Validar
+                                </button>
+                              ))}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            )}
+          </div>
         )}
 
         {tab === "ausencias" && (

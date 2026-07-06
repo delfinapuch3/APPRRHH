@@ -6,7 +6,7 @@ export interface AuthUser {
   email: string;
   nombre: string;
   role: "ADMIN" | "ENCARGADO";
-  obraIds: string[];
+  sectorIds: string[];
 }
 
 interface AuthContextValue {
