@@ -11,6 +11,8 @@ interface Empleado {
 
 interface PreviewResult {
   token: string;
+  sheetNames: string[];
+  sheet: string;
   headers: string[];
   sample: Record<string, unknown>[];
   totalRows: number;
@@ -39,6 +41,19 @@ export default function Fichadas() {
   });
   const [importResult, setImportResult] = useState<{ insertados: number; errores: string[] } | null>(null);
 
+  function guessMapping(headers: string[]) {
+    const guess = (needle: string) => headers.find((h) => h.toLowerCase().includes(needle)) ?? "";
+    const marcaciones = guess("marcacion");
+    return {
+      legajo: guess("legajo"),
+      fecha: guess("fecha"),
+      modo: (marcaciones ? "combinado" : "separado") as "separado" | "combinado",
+      horaEntrada: marcaciones ? "" : guess("entrada"),
+      horaSalida: marcaciones ? "" : guess("salida"),
+      marcaciones,
+    };
+  }
+
   const previewMutation = useMutation({
     mutationFn: async (file: File) => {
       const fd = new FormData();
@@ -48,22 +63,22 @@ export default function Fichadas() {
     onSuccess: (data) => {
       setPreview(data);
       setImportResult(null);
-      const guess = (needle: string) => data.headers.find((h) => h.toLowerCase().includes(needle)) ?? "";
-      const marcaciones = guess("marcacion");
-      setMapping({
-        legajo: guess("legajo"),
-        fecha: guess("fecha"),
-        modo: marcaciones ? "combinado" : "separado",
-        horaEntrada: marcaciones ? "" : guess("entrada"),
-        horaSalida: marcaciones ? "" : guess("salida"),
-        marcaciones,
-      });
+      setMapping(guessMapping(data.headers));
+    },
+  });
+
+  const sheetMutation = useMutation({
+    mutationFn: async (sheet: string) =>
+      (await api.post("/fichadas/import/preview-sheet", { token: preview!.token, sheet })).data as Omit<PreviewResult, "token">,
+    onSuccess: (data) => {
+      setPreview((p) => (p ? { ...p, ...data } : p));
+      setMapping(guessMapping(data.headers));
     },
   });
 
   const confirmMutation = useMutation({
     mutationFn: async () =>
-      (await api.post("/fichadas/import/confirm", { token: preview!.token, mapping })).data as {
+      (await api.post("/fichadas/import/confirm", { token: preview!.token, sheet: preview!.sheet, mapping })).data as {
         insertados: number;
         errores: string[];
       },
@@ -111,6 +126,22 @@ export default function Fichadas() {
 
           {preview && (
             <div className="mt-3">
+              {preview.sheetNames.length > 1 && (
+                <div className="mb-3">
+                  <label className="block text-xs text-slate-500 mb-1">Hoja del archivo</label>
+                  <select
+                    value={preview.sheet}
+                    onChange={(e) => sheetMutation.mutate(e.target.value)}
+                    className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+                  >
+                    {preview.sheetNames.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <p className="text-sm text-slate-500 mb-2">{preview.totalRows} filas encontradas. Mapeá las columnas:</p>
 
               <div className="mb-3">

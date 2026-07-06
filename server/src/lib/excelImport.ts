@@ -9,6 +9,39 @@ export function parseWorkbook(buffer: Buffer) {
   return { rows, headers };
 }
 
+export interface ParsedSheet {
+  rows: Record<string, unknown>[];
+  headers: string[];
+}
+
+/** Parsea TODAS las hojas de un archivo (los reportes reales suelen venir con varias, ej. una de parámetros y otra con los datos). */
+export function parseWorkbookAllSheets(buffer: Buffer): { sheetNames: string[]; sheets: Record<string, ParsedSheet> } {
+  const wb = XLSX.read(buffer, { type: "buffer", cellDates: true });
+  const sheets: Record<string, ParsedSheet> = {};
+  for (const name of wb.SheetNames) {
+    const sheet = wb.Sheets[name];
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+    const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+    sheets[name] = { rows, headers };
+  }
+  return { sheetNames: wb.SheetNames, sheets };
+}
+
+/** Elige la hoja cuyos encabezados mejor matchean las palabras clave esperadas (ej. "legajo", "nombre"). */
+export function pickBestSheet(sheetNames: string[], sheets: Record<string, ParsedSheet>, keywords: string[]): string {
+  let best = sheetNames[0];
+  let bestScore = -1;
+  for (const name of sheetNames) {
+    const headers = sheets[name].headers.map((h) => h.toLowerCase());
+    const score = keywords.reduce((acc, kw) => acc + (headers.some((h) => h.includes(kw)) ? 1 : 0), 0);
+    if (score > bestScore && sheets[name].rows.length > 0) {
+      bestScore = score;
+      best = name;
+    }
+  }
+  return best;
+}
+
 export function excelSerialToDate(serial: number): Date {
   // Excel epoch: 1899-12-30
   const utcDays = Math.floor(serial - 25569);

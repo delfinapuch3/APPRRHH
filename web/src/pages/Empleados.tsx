@@ -23,6 +23,8 @@ interface Obra {
 
 interface PreviewResult {
   token: string;
+  sheetNames: string[];
+  sheet: string;
   headers: string[];
   sample: Record<string, unknown>[];
   totalRows: number;
@@ -114,9 +116,30 @@ export default function Empleados() {
     },
   });
 
+  const sheetMutation = useMutation({
+    mutationFn: async (sheet: string) =>
+      (await api.post("/empleados/import/preview-sheet", { token: preview!.token, sheet })).data as Omit<
+        PreviewResult,
+        "token"
+      >,
+    onSuccess: (data) => {
+      setPreview((p) => (p ? { ...p, ...data } : p));
+      const guess = (needle: string) => data.headers.find((h) => h.toLowerCase().includes(needle)) ?? "";
+      setMapping({
+        legajo: guess("legajo"),
+        nombre: guess("nombre"),
+        apellido: guess("apellido"),
+        sindicato: guess("sindicato"),
+        valorHoraNormal: guess("hora"),
+        fechaIngreso: guess("ingreso"),
+        obra: guess("obra"),
+      });
+    },
+  });
+
   const confirmMutation = useMutation({
     mutationFn: async () =>
-      (await api.post("/empleados/import/confirm", { token: preview!.token, mapping })).data as {
+      (await api.post("/empleados/import/confirm", { token: preview!.token, sheet: preview!.sheet, mapping })).data as {
         creados: number;
         actualizados: number;
         errores: string[];
@@ -177,6 +200,22 @@ export default function Empleados() {
 
           {preview && (
             <div className="mt-3">
+              {preview.sheetNames.length > 1 && (
+                <div className="mb-3">
+                  <label className="block text-xs text-slate-500 mb-1">Hoja del archivo</label>
+                  <select
+                    value={preview.sheet}
+                    onChange={(e) => sheetMutation.mutate(e.target.value)}
+                    className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+                  >
+                    {preview.sheetNames.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <p className="text-sm text-slate-500 mb-2">{preview.totalRows} filas encontradas. Mapeá las columnas:</p>
               <div className="grid grid-cols-3 gap-3 mb-3">
                 {MAPPING_FIELDS.map(([field, label]) => (
@@ -197,16 +236,15 @@ export default function Empleados() {
                   </div>
                 ))}
               </div>
+              {!mapping.fechaIngreso && (
+                <p className="text-xs text-amber-600 mb-3">
+                  No mapeaste fecha de ingreso: se va a usar la fecha de hoy como provisoria y podés corregirla después
+                  en la ficha de cada empleado.
+                </p>
+              )}
               <button
                 onClick={() => confirmMutation.mutate()}
-                disabled={
-                  !mapping.legajo ||
-                  !mapping.nombre ||
-                  !mapping.apellido ||
-                  !mapping.valorHoraNormal ||
-                  !mapping.fechaIngreso ||
-                  confirmMutation.isPending
-                }
+                disabled={!mapping.legajo || !mapping.nombre || !mapping.apellido || !mapping.valorHoraNormal || confirmMutation.isPending}
                 className="bg-slate-900 text-white text-sm px-4 py-2 rounded-md hover:bg-slate-800 disabled:opacity-50"
               >
                 {confirmMutation.isPending ? "Importando..." : "Confirmar importación"}

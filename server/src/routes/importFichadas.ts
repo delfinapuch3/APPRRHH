@@ -5,15 +5,17 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { recalcularEmpleadoPeriodo } from "../engine/recalcular.js";
 import { localDateTime } from "../lib/dates.js";
-import { parseMarcaciones, parseWorkbook, toDateOnlyFromCell } from "../lib/excelImport.js";
+import { parseMarcaciones, parseWorkbookAllSheets, pickBestSheet, toDateOnlyFromCell, type ParsedSheet } from "../lib/excelImport.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
+const KEYWORDS = ["legajo", "fecha", "marcacion", "entrada", "salida"];
+
 interface CachedImport {
   nombreArchivo: string;
-  rows: Record<string, unknown>[];
-  headers: string[];
+  sheetNames: string[];
+  sheets: Record<string, ParsedSheet>;
   expiresAt: number;
 }
 const cache = new Map<string, CachedImport>();
@@ -25,23 +27,45 @@ function cleanupCache() {
   }
 }
 
+function sheetSummary(sheetNames: string[], sheet: string, parsed: ParsedSheet) {
+  return {
+    sheetNames,
+    sheet,
+    headers: parsed.headers,
+    sample: parsed.rows.slice(0, 15),
+    totalRows: parsed.rows.length,
+  };
+}
+
 router.post("/preview", upload.single("file"), (req, res) => {
   cleanupCache();
   if (!req.file) return res.status(400).json({ error: "Falta el archivo" });
   try {
-    const { rows, headers } = parseWorkbook(req.file.buffer);
-    if (rows.length === 0) return res.status(400).json({ error: "El archivo no tiene filas" });
+    const { sheetNames, sheets } = parseWorkbookAllSheets(req.file.buffer);
+    const nonEmpty = sheetNames.filter((n) => sheets[n].rows.length > 0);
+    if (nonEmpty.length === 0) return res.status(400).json({ error: "El archivo no tiene filas en ninguna hoja" });
+    const sheet = pickBestSheet(nonEmpty, sheets, KEYWORDS);
     const token = randomUUID();
     cache.set(token, {
       nombreArchivo: req.file.originalname,
-      rows,
-      headers,
+      sheetNames,
+      sheets,
       expiresAt: Date.now() + 15 * 60 * 1000,
     });
-    res.json({ token, headers, sample: rows.slice(0, 15), totalRows: rows.length });
+    res.json({ token, ...sheetSummary(sheetNames, sheet, sheets[sheet]) });
   } catch {
     res.status(400).json({ error: "No se pudo leer el archivo. Verificá que sea .xlsx o .csv" });
   }
+});
+
+router.post("/preview-sheet", (req, res) => {
+  const { token, sheet } = req.body as { token?: string; sheet?: string };
+  if (!token || !sheet) return res.status(400).json({ error: "Falta token o nombre de hoja" });
+  const entry = cache.get(token);
+  if (!entry) return res.status(400).json({ error: "La vista previa expiró, volvé a subir el archivo" });
+  const parsed = entry.sheets[sheet];
+  if (!parsed) return res.status(400).json({ error: "Esa hoja no existe en el archivo" });
+  res.json(sheetSummary(entry.sheetNames, sheet, parsed));
 });
 
 function combineFechaHora(fecha: Date, value: unknown): Date | null {
@@ -69,6 +93,7 @@ function horaStringToDate(fecha: Date, hhmm: string): Date {
 
 const confirmSchema = z.object({
   token: z.string(),
+  sheet: z.string(),
   mapping: z.object({
     legajo: z.string(),
     fecha: z.string(),
@@ -82,9 +107,11 @@ const confirmSchema = z.object({
 router.post("/confirm", async (req, res) => {
   const parsed = confirmSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const { token, mapping } = parsed.data;
+  const { token, sheet, mapping } = parsed.data;
   const entry = cache.get(token);
   if (!entry) return res.status(400).json({ error: "La vista previa expiró, volvé a subir el archivo" });
+  const hoja = entry.sheets[sheet];
+  if (!hoja) return res.status(400).json({ error: "Esa hoja no existe en el archivo" });
 
   const empleados = await prisma.employee.findMany({ select: { id: true, legajo: true } });
   const legajoToId = new Map(empleados.map((e) => [e.legajo.trim(), e.id]));
@@ -104,7 +131,7 @@ router.post("/confirm", async (req, res) => {
     }
   }
 
-  entry.rows.forEach((row, idx) => {
+  hoja.rows.forEach((row, idx) => {
     const legajoRaw = String(row[mapping.legajo] ?? "").trim();
     if (!legajoRaw) return; // fila vacía
     const employeeId = legajoToId.get(legajoRaw);
