@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { api } from "../api/client.js";
+import { api, errorMessage } from "../api/client.js";
 import { useAuth } from "../auth/AuthContext.js";
 
 interface Empleado {
@@ -137,7 +137,7 @@ export default function Empleados() {
     mutationFn: async (file: File) => {
       const fd = new FormData();
       fd.append("file", file);
-      return (await api.post("/empleados/import/preview", fd, { headers: { "Content-Type": "multipart/form-data" } })).data as PreviewResult;
+      return (await api.post("/empleados/import/preview", fd)).data as PreviewResult;
     },
     onSuccess: (data) => {
       setPreview(data);
@@ -242,7 +242,9 @@ export default function Empleados() {
             className="text-sm mb-3"
           />
           {previewMutation.isPending && <p className="text-sm text-slate-500">Leyendo archivo...</p>}
-          {previewMutation.isError && <p className="text-sm text-red-600">No se pudo leer el archivo</p>}
+          {previewMutation.isError && (
+            <p className="text-sm text-red-600">{errorMessage(previewMutation.error, "No se pudo leer el archivo")}</p>
+          )}
 
           {preview && (
             <div className="mt-3">
@@ -295,6 +297,9 @@ export default function Empleados() {
               >
                 {confirmMutation.isPending ? "Importando..." : "Confirmar importación"}
               </button>
+              {confirmMutation.isError && (
+                <p className="text-sm text-red-600 mt-2">{errorMessage(confirmMutation.error, "No se pudo importar el archivo")}</p>
+              )}
             </div>
           )}
 

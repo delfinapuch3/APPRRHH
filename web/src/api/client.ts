@@ -23,3 +23,19 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+/** Extrae el mensaje más útil posible de un error de axios para mostrarlo en pantalla. */
+export function errorMessage(err: unknown, fallback: string): string {
+  if (!err || typeof err !== "object") return fallback;
+  const anyErr = err as { response?: { data?: { error?: unknown } }; request?: unknown; message?: string };
+  const serverError = anyErr.response?.data?.error;
+  if (typeof serverError === "string" && serverError.trim()) return serverError;
+  if (serverError && typeof serverError === "object") {
+    // errores de validación de zod (flatten): mostrar el primer mensaje de campo si existe
+    const flat = serverError as { fieldErrors?: Record<string, string[]>; formErrors?: string[] };
+    const primero = flat.formErrors?.[0] ?? Object.values(flat.fieldErrors ?? {})[0]?.[0];
+    if (primero) return primero;
+  }
+  if (anyErr.request && !anyErr.response) return "No se pudo conectar con el servidor. Verificá que esté corriendo.";
+  return fallback;
+}
