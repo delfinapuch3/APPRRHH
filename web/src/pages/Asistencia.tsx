@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client.js";
 import { TIPOS_AUSENCIA, labelTipoAusencia } from "../lib/tiposAusencia.js";
+import { invalidarAsistenciaRelacionada } from "../lib/invalidarAsistencia.js";
 
 function firstOfMonth() {
   const d = new Date();
@@ -51,9 +52,7 @@ export default function Asistencia() {
         observaciones: observaciones || undefined,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["faltas-sin-clasificar"] });
-      queryClient.invalidateQueries({ queryKey: ["asistencia-resumen"] });
-      queryClient.invalidateQueries({ queryKey: ["asistencia-dia"] });
+      invalidarAsistenciaRelacionada(queryClient);
       setSeleccion(null);
       setObservaciones("");
     },

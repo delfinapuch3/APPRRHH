@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client.js";
+import { invalidarAsistenciaRelacionada } from "../lib/invalidarAsistencia.js";
 
 interface Empleado {
   id: string;
@@ -35,7 +36,7 @@ export default function Vacaciones() {
         diasTomados: Number(form.diasTomados),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vacaciones-balance", employeeId, anio] });
+      invalidarAsistenciaRelacionada(queryClient);
       setForm({ fechaDesde: "", fechaHasta: "", diasTomados: "" });
     },
   });

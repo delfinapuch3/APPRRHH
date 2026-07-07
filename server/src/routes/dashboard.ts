@@ -3,6 +3,7 @@ import { prisma } from "../db.js";
 import { sectorScope } from "../middleware/auth.js";
 import { recalcularSectorPeriodo } from "../engine/recalcular.js";
 import { addUtcDays, utcDateOnlyFrom } from "../lib/dates.js";
+import { SECTOR_LUNES_A_VIERNES } from "../lib/constants.js";
 
 const router = Router();
 
@@ -135,7 +136,7 @@ router.get("/horas-por-sector", async (req, res) => {
     const horasTrabajadas = calculos.reduce((a, c) => a + c.horasNormales + c.horasExtra50 + c.horasExtra100, 0);
     const diasEsperadosPorEmpleado = new Map<string, number>();
     for (const c of calculos) {
-      if (c.tipoDia !== "DOMINGO" && !(sector.trabajaSabados === false && c.tipoDia === "SABADO")) {
+      if (c.tipoDia !== "DOMINGO" && !(sector.nombre === SECTOR_LUNES_A_VIERNES && c.tipoDia === "SABADO")) {
         diasEsperadosPorEmpleado.set(c.employeeId, (diasEsperadosPorEmpleado.get(c.employeeId) ?? 0) + 1);
       }
     }

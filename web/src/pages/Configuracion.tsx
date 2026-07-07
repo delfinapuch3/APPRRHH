@@ -25,12 +25,7 @@ export default function Configuracion() {
   const { data: sectores } = useQuery({
     queryKey: ["sectores"],
     queryFn: async () =>
-      (await api.get("/sectores")).data as {
-        id: string;
-        nombre: string;
-        empresa: { nombre: string } | null;
-        trabajaSabados: boolean;
-      }[],
+      (await api.get("/sectores")).data as { id: string; nombre: string; empresa: { nombre: string } | null }[],
   });
   const { data: feriados } = useQuery({
     queryKey: ["feriados"],
@@ -63,12 +58,6 @@ export default function Configuracion() {
       queryClient.invalidateQueries({ queryKey: ["sectores"] });
       setNuevoSector({ nombre: "", empresaId: "" });
     },
-  });
-
-  const actualizarSector = useMutation({
-    mutationFn: async ({ id, trabajaSabados }: { id: string; trabajaSabados: boolean }) =>
-      api.put(`/sectores/${id}`, { trabajaSabados }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["sectores"] }),
   });
 
   const [nuevoFeriado, setNuevoFeriado] = useState({ fecha: "", nombre: "" });
@@ -219,20 +208,10 @@ export default function Configuracion() {
 
         <div className="bg-white rounded-lg shadow-sm p-5">
           <h2 className="font-medium text-slate-700 mb-3">Sectores</h2>
-          <ul className="text-sm mb-3 space-y-1.5">
+          <ul className="text-sm mb-3 space-y-1">
             {sectores?.map((s) => (
-              <li key={s.id} className="flex items-center justify-between text-slate-600">
-                <span>
-                  {s.nombre} {s.empresa ? `(${s.empresa.nombre})` : ""}
-                </span>
-                <label className="flex items-center gap-1.5 text-xs text-slate-500">
-                  <input
-                    type="checkbox"
-                    checked={s.trabajaSabados}
-                    onChange={(e) => actualizarSector.mutate({ id: s.id, trabajaSabados: e.target.checked })}
-                  />
-                  Trabaja sábados
-                </label>
+              <li key={s.id} className="text-slate-600">
+                {s.nombre} {s.empresa ? `(${s.empresa.nombre})` : ""}
               </li>
             ))}
           </ul>

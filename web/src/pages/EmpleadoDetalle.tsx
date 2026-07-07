@@ -5,6 +5,7 @@ import { api } from "../api/client.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { TIPOS_AUSENCIA, labelTipoAusencia } from "../lib/tiposAusencia.js";
 import FichadaEditModal from "../components/FichadaEditModal.js";
+import { invalidarAsistenciaRelacionada } from "../lib/invalidarAsistencia.js";
 
 interface Empleado {
   id: string;
@@ -185,6 +186,7 @@ export default function EmpleadoDetalle() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ausencias", id] });
+      invalidarAsistenciaRelacionada(queryClient);
       setNuevaAusencia({ fechaDesde: "", fechaHasta: "", tipo: "PERMISO_PERSONAL", justificada: true, observaciones: "" });
     },
   });
@@ -622,7 +624,7 @@ export default function EmpleadoDetalle() {
           horasExtra100={diaEnEdicion.horasExtra100}
           horasManual={diaEnEdicion.horasManual}
           onClose={() => setDiaEnEdicion(null)}
-          onSaved={() => queryClient.invalidateQueries({ queryKey: ["asistencia-empleado", id] })}
+          onSaved={() => invalidarAsistenciaRelacionada(queryClient)}
         />
       )}
     </div>

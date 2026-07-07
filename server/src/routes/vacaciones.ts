@@ -4,6 +4,7 @@ import { prisma } from "../db.js";
 import { sectorScope } from "../middleware/auth.js";
 import { diasCorrespondientes, type TramoVacaciones } from "../engine/vacaciones.js";
 import { sendXlsx } from "../lib/xlsxExport.js";
+import { recalcularEmpleadoPeriodo } from "../engine/recalcular.js";
 
 const router = Router();
 
@@ -80,18 +81,30 @@ router.post("/", async (req, res) => {
   const parsed = vacacionSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   const periodo = await prisma.vacationPeriod.create({ data: parsed.data });
+  // Los días dentro de este período dejan de contar como ausencia: hay que
+  // recalcular para que se refleje enseguida en Asistencia y el Dashboard.
+  await recalcularEmpleadoPeriodo(periodo.employeeId, periodo.fechaDesde, periodo.fechaHasta);
   res.status(201).json(periodo);
 });
 
 router.put("/:id", async (req, res) => {
   const parsed = vacacionSchema.partial().safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const anterior = await prisma.vacationPeriod.findUnique({ where: { id: req.params.id } });
+  if (!anterior) return res.status(404).json({ error: "No encontrado" });
   const periodo = await prisma.vacationPeriod.update({ where: { id: req.params.id }, data: parsed.data });
+  // Recalcula tanto el rango viejo (por si se achicó o cambió de empleado) como el nuevo.
+  await recalcularEmpleadoPeriodo(anterior.employeeId, anterior.fechaDesde, anterior.fechaHasta);
+  if (periodo.employeeId !== anterior.employeeId || periodo.fechaDesde.getTime() !== anterior.fechaDesde.getTime() || periodo.fechaHasta.getTime() !== anterior.fechaHasta.getTime()) {
+    await recalcularEmpleadoPeriodo(periodo.employeeId, periodo.fechaDesde, periodo.fechaHasta);
+  }
   res.json(periodo);
 });
 
 router.delete("/:id", async (req, res) => {
-  await prisma.vacationPeriod.delete({ where: { id: req.params.id } });
+  const periodo = await prisma.vacationPeriod.delete({ where: { id: req.params.id } });
+  // Sin el período, esos días vuelven a evaluarse como ausencia si no hay fichada.
+  await recalcularEmpleadoPeriodo(periodo.employeeId, periodo.fechaDesde, periodo.fechaHasta);
   res.status(204).end();
 });
 

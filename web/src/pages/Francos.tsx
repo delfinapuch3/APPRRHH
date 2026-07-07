@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client.js";
+import { invalidarAsistenciaRelacionada } from "../lib/invalidarAsistencia.js";
 
 const ESTADOS = ["PENDIENTE", "TOMADO"] as const;
 
@@ -16,7 +17,7 @@ export default function Francos() {
   const actualizar = useMutation({
     mutationFn: async ({ id, nuevoEstado }: { id: string; nuevoEstado: string }) =>
       api.put(`/francos/${id}`, { estado: nuevoEstado, ...(nuevoEstado === "TOMADO" ? { fechaTomado: new Date().toISOString() } : {}) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["francos-list"] }),
+    onSuccess: () => invalidarAsistenciaRelacionada(queryClient),
   });
 
   async function exportar() {

@@ -84,15 +84,14 @@ model Empresa {
 }
 
 model Sector {
-  id             String       @id @default(cuid())
-  nombre         String
-  activo         Boolean      @default(true)
-  trabajaSabados Boolean      @default(true)
-  createdAt      DateTime     @default(now())
-  empresaId      String?
-  empresa        Empresa?     @relation(fields: [empresaId], references: [id])
-  empleados      Employee[]
-  encargados     UserSector[]
+  id         String       @id @default(cuid())
+  nombre     String
+  activo     Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  empresaId  String?
+  empresa    Empresa?     @relation(fields: [empresaId], references: [id])
+  empleados  Employee[]
+  encargados UserSector[]
 }
 
 model UserSector {

@@ -4,6 +4,7 @@ import { prisma } from "../db.js";
 import { sectorScope, requireAdmin } from "../middleware/auth.js";
 import { recalcularSectorPeriodo, recalcularEmpleadoPeriodo } from "../engine/recalcular.js";
 import { utcDateOnlyFrom } from "../lib/dates.js";
+import { SECTOR_LUNES_A_VIERNES } from "../lib/constants.js";
 
 const router = Router();
 
@@ -32,7 +33,7 @@ router.get("/resumen", async (req, res) => {
       activo: true,
       ...(scope ? { sectorId: { in: scope } } : sectorId ? { sectorId } : {}),
     },
-    include: { sector: { select: { trabajaSabados: true } } },
+    include: { sector: { select: { nombre: true } } },
   });
 
   const empleadoIds = empleados.map((e) => e.id);
@@ -41,9 +42,11 @@ router.get("/resumen", async (req, res) => {
   });
 
   const porEmpleado = empleados.map((emp) => {
-    const noTrabajaSabados = emp.sector?.trabajaSabados === false;
+    const trabajaLunesAViernesNomas = emp.sector?.nombre === SECTOR_LUNES_A_VIERNES;
     const dias = calculos.filter((c) => c.employeeId === emp.id);
-    const diasEsperados = dias.filter((d) => d.tipoDia !== "DOMINGO" && !(noTrabajaSabados && d.tipoDia === "SABADO")).length;
+    const diasEsperados = dias.filter(
+      (d) => d.tipoDia !== "DOMINGO" && !(trabajaLunesAViernesNomas && d.tipoDia === "SABADO")
+    ).length;
     const ausenciasInjustificadas = dias.filter((d) => d.ausente && d.justificada === false).length;
     const ausenciasSinClasificar = dias.filter((d) => d.ausente && d.justificada === null).length;
     const ausenciasJustificadas = dias.filter((d) => d.ausente && d.justificada === true).length;

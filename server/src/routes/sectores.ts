@@ -14,7 +14,6 @@ const sectorSchema = z.object({
   nombre: z.string().min(1),
   empresaId: z.string().nullable().optional(),
   activo: z.boolean().optional(),
-  trabajaSabados: z.boolean().optional(),
 });
 
 router.post("/", requireAdmin, async (req, res) => {
