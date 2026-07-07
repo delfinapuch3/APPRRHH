@@ -172,7 +172,7 @@ export default function Configuracion() {
           ))}
         </div>
 
-        <button onClick={() => guardar.mutate()} className="bg-slate-900 text-white text-sm px-4 py-2 rounded-md hover:bg-slate-800">
+        <button onClick={() => guardar.mutate()} className="bg-primary text-white text-sm px-4 py-2 rounded-md hover:bg-primary-dark">
           {guardar.isPending ? "Guardando..." : "Guardar configuración"}
         </button>
       </div>
@@ -200,7 +200,7 @@ export default function Configuracion() {
               placeholder="Nombre de la empresa"
               className="flex-1 border border-slate-300 rounded-md px-2 py-1.5 text-sm"
             />
-            <button type="submit" className="bg-slate-900 text-white text-sm px-3 py-1.5 rounded-md">
+            <button type="submit" className="bg-primary text-white text-sm px-3 py-1.5 rounded-md">
               Agregar
             </button>
           </form>
@@ -240,7 +240,7 @@ export default function Configuracion() {
                 </option>
               ))}
             </select>
-            <button type="submit" className="bg-slate-900 text-white text-sm px-3 py-1.5 rounded-md w-full">
+            <button type="submit" className="bg-primary text-white text-sm px-3 py-1.5 rounded-md w-full">
               Agregar
             </button>
           </form>
@@ -281,7 +281,7 @@ export default function Configuracion() {
               onChange={(e) => setNuevoFeriado({ ...nuevoFeriado, nombre: e.target.value })}
               className="flex-1 border border-slate-300 rounded-md px-2 py-1.5 text-sm"
             />
-            <button type="submit" className="bg-slate-900 text-white text-sm px-3 py-1.5 rounded-md">
+            <button type="submit" className="bg-primary text-white text-sm px-3 py-1.5 rounded-md">
               Agregar
             </button>
           </form>

@@ -197,7 +197,7 @@ export default function Empleados() {
                   setShowForm((v) => !v);
                   setShowImport(false);
                 }}
-                className="bg-slate-900 text-white text-sm px-4 py-2 rounded-md hover:bg-slate-800"
+                className="bg-primary text-white text-sm px-4 py-2 rounded-md hover:bg-primary-dark"
               >
                 {showForm ? "Cancelar" : "+ Nuevo empleado"}
               </button>
@@ -293,7 +293,7 @@ export default function Empleados() {
               <button
                 onClick={() => confirmMutation.mutate()}
                 disabled={!mapping.legajo || !mapping.nombre || !mapping.apellido || !mapping.valorHoraNormal || confirmMutation.isPending}
-                className="bg-slate-900 text-white text-sm px-4 py-2 rounded-md hover:bg-slate-800 disabled:opacity-50"
+                className="bg-primary text-white text-sm px-4 py-2 rounded-md hover:bg-primary-dark disabled:opacity-50"
               >
                 {confirmMutation.isPending ? "Importando..." : "Confirmar importación"}
               </button>
@@ -305,7 +305,7 @@ export default function Empleados() {
 
           {importResult && (
             <div className="mt-4 text-sm">
-              <p className="text-emerald-700">
+              <p className="text-primary-dark">
                 {importResult.creados} empleados creados, {importResult.actualizados} actualizados.
               </p>
               {importResult.errores.length > 0 && (
@@ -414,7 +414,7 @@ export default function Empleados() {
             </select>
           </div>
           <div className="col-span-3">
-            <button type="submit" className="bg-slate-900 text-white text-sm px-4 py-2 rounded-md hover:bg-slate-800">
+            <button type="submit" className="bg-primary text-white text-sm px-4 py-2 rounded-md hover:bg-primary-dark">
               Guardar
             </button>
           </div>

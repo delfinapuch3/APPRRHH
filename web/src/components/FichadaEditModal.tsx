@@ -1,0 +1,246 @@
+import { useState } from "react";
+import { api, errorMessage } from "../api/client.js";
+
+interface Fichada {
+  id: string;
+  horaEntrada: string;
+  horaSalida: string | null;
+}
+
+interface FilaFichada {
+  id: string | null;
+  fechaEntrada: string;
+  horaEntrada: string;
+  fechaSalida: string;
+  horaSalida: string;
+  eliminar: boolean;
+}
+
+interface Props {
+  employeeId: string;
+  empleadoNombre: string;
+  fecha: string; // YYYY-MM-DD, día calendario que se está corrigiendo
+  fichadas: Fichada[];
+  horasNormales: number;
+  horasExtra50: number;
+  horasExtra100: number;
+  horasManual: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+function toLocalDateStr(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function toLocalTimeStr(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+export default function FichadaEditModal({
+  employeeId,
+  empleadoNombre,
+  fecha,
+  fichadas,
+  horasNormales,
+  horasExtra50,
+  horasExtra100,
+  horasManual,
+  onClose,
+  onSaved,
+}: Props) {
+  const totalActual = horasNormales + horasExtra50 + horasExtra100;
+
+  const [filas, setFilas] = useState<FilaFichada[]>(() =>
+    fichadas.length > 0
+      ? fichadas.map((f) => ({
+          id: f.id,
+          fechaEntrada: toLocalDateStr(f.horaEntrada),
+          horaEntrada: toLocalTimeStr(f.horaEntrada),
+          fechaSalida: f.horaSalida ? toLocalDateStr(f.horaSalida) : toLocalDateStr(f.horaEntrada),
+          horaSalida: f.horaSalida ? toLocalTimeStr(f.horaSalida) : "",
+          eliminar: false,
+        }))
+      : [{ id: null, fechaEntrada: fecha, horaEntrada: "", fechaSalida: fecha, horaSalida: "", eliminar: false }]
+  );
+  const [horasInput, setHorasInput] = useState(totalActual.toFixed(1));
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function actualizarFila(idx: number, cambios: Partial<FilaFichada>) {
+    setFilas((prev) => prev.map((f, i) => (i === idx ? { ...f, ...cambios } : f)));
+  }
+
+  function agregarFila() {
+    setFilas((prev) => [...prev, { id: null, fechaEntrada: fecha, horaEntrada: "", fechaSalida: fecha, horaSalida: "", eliminar: false }]);
+  }
+
+  function quitarFila(idx: number) {
+    setFilas((prev) => {
+      const fila = prev[idx];
+      if (fila.id) return prev.map((f, i) => (i === idx ? { ...f, eliminar: !f.eliminar } : f));
+      return prev.filter((_, i) => i !== idx);
+    });
+  }
+
+  async function guardar() {
+    setGuardando(true);
+    setError(null);
+    try {
+      for (const fila of filas) {
+        if (fila.id && fila.eliminar) {
+          await api.delete(`/fichadas/${fila.id}`);
+          continue;
+        }
+        if (fila.eliminar || !fila.horaEntrada) continue;
+        const body = {
+          employeeId,
+          fecha: fila.fechaEntrada,
+          horaEntrada: `${fila.fechaEntrada}T${fila.horaEntrada}:00`,
+          horaSalida: fila.horaSalida ? `${fila.fechaSalida}T${fila.horaSalida}:00` : null,
+        };
+        if (fila.id) {
+          await api.put(`/fichadas/${fila.id}`, body);
+        } else {
+          await api.post("/fichadas", body);
+        }
+      }
+
+      const nuevoTotal = Number(horasInput);
+      if (!Number.isNaN(nuevoTotal) && Math.abs(nuevoTotal - totalActual) > 0.01) {
+        await api.put("/asistencia/horas-manual", { employeeId, fecha, horasTrabajadas: nuevoTotal });
+      }
+
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(errorMessage(err, "No se pudo guardar la corrección"));
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function restablecerHoras() {
+    setGuardando(true);
+    setError(null);
+    try {
+      await api.put("/asistencia/horas-manual", { employeeId, fecha, horasTrabajadas: null });
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(errorMessage(err, "No se pudo restablecer el cálculo"));
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-medium text-slate-800 mb-1">Corregir fichada</h3>
+        <p className="text-sm text-slate-500 mb-4">
+          {empleadoNombre} ·{" "}
+          {new Date(`${fecha}T00:00:00`).toLocaleDateString("es-AR", { timeZone: "UTC" })}
+        </p>
+
+        <div className="space-y-3 mb-4">
+          {filas.map((fila, idx) => (
+            <div key={idx} className={`border rounded-md p-3 ${fila.eliminar ? "opacity-40 border-red-200 bg-red-50" : "border-slate-200"}`}>
+              <div className="grid grid-cols-2 gap-3 mb-2">
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Fecha de ingreso</label>
+                  <input
+                    type="date"
+                    disabled={fila.eliminar}
+                    value={fila.fechaEntrada}
+                    onChange={(e) => actualizarFila(idx, { fechaEntrada: e.target.value })}
+                    className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm disabled:bg-slate-100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Hora de ingreso</label>
+                  <input
+                    type="time"
+                    disabled={fila.eliminar}
+                    value={fila.horaEntrada}
+                    onChange={(e) => actualizarFila(idx, { horaEntrada: e.target.value })}
+                    className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm disabled:bg-slate-100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Fecha de salida</label>
+                  <input
+                    type="date"
+                    disabled={fila.eliminar}
+                    value={fila.fechaSalida}
+                    onChange={(e) => actualizarFila(idx, { fechaSalida: e.target.value })}
+                    className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm disabled:bg-slate-100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Hora de salida</label>
+                  <input
+                    type="time"
+                    disabled={fila.eliminar}
+                    value={fila.horaSalida}
+                    onChange={(e) => actualizarFila(idx, { horaSalida: e.target.value })}
+                    className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm disabled:bg-slate-100"
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => quitarFila(idx)}
+                className="text-xs text-red-600 hover:underline"
+              >
+                {fila.id ? (fila.eliminar ? "Deshacer eliminación" : "Eliminar esta marcación") : "Quitar"}
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <button type="button" onClick={agregarFila} className="text-sm text-primary hover:underline mb-5">
+          + Agregar marcación
+        </button>
+
+        <div className="border-t border-slate-200 pt-4 mb-2">
+          <label className="block text-xs text-slate-500 mb-1">Horas trabajadas (total del día)</label>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              step="0.1"
+              min="0"
+              max="24"
+              value={horasInput}
+              onChange={(e) => setHorasInput(e.target.value)}
+              className="w-28 border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+            />
+            <span className="text-xs text-slate-400">
+              Calculado automáticamente: {totalActual.toFixed(1)}hs
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 mt-1">
+            Si cambiás este valor, queda fijado manualmente y no se recalcula solo con las marcaciones de arriba.
+          </p>
+          {horasManual && (
+            <button type="button" onClick={restablecerHoras} disabled={guardando} className="text-xs text-accent-dark hover:underline mt-1">
+              Restablecer al cálculo automático
+            </button>
+          )}
+        </div>
+
+        {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
+
+        <div className="flex justify-end gap-2 mt-4">
+          <button onClick={onClose} className="btn-secondary" type="button">
+            Cancelar
+          </button>
+          <button onClick={guardar} disabled={guardando} className="btn-primary disabled:opacity-50" type="button">
+            {guardando ? "Guardando..." : "Guardar cambios"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { TIPOS_AUSENCIA, labelTipoAusencia } from "../lib/tiposAusencia.js";
+import FichadaEditModal from "../components/FichadaEditModal.js";
 
 interface Empleado {
   id: string;
@@ -38,6 +39,7 @@ interface DiaResumen {
   horasExtra100: number;
   ausente: boolean;
   extrasValidadas: boolean;
+  horasManual: boolean;
   fichadas: Fichada[];
 }
 
@@ -52,7 +54,7 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 function formatHora(iso: string) {
-  return new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
 export default function EmpleadoDetalle() {
@@ -101,6 +103,8 @@ export default function EmpleadoDetalle() {
     mutationFn: async (fecha: string) => api.put("/asistencia/validar", { employeeId: id, fecha }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["asistencia-empleado", id] }),
   });
+
+  const [diaEnEdicion, setDiaEnEdicion] = useState<DiaResumen | null>(null);
 
   // --- edición ---
   const [form, setForm] = useState({
@@ -311,7 +315,7 @@ export default function EmpleadoDetalle() {
             </select>
           </div>
           <div className="col-span-3">
-            <button type="submit" className="bg-slate-900 text-white text-sm px-4 py-2 rounded-md hover:bg-slate-800">
+            <button type="submit" className="bg-primary text-white text-sm px-4 py-2 rounded-md hover:bg-primary-dark">
               Guardar cambios
             </button>
           </div>
@@ -324,7 +328,7 @@ export default function EmpleadoDetalle() {
             key={t}
             onClick={() => setTab(t)}
             className={`px-4 py-2 rounded-md text-sm capitalize ${
-              tab === t ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-100"
+              tab === t ? "bg-primary text-white" : "bg-white text-slate-600 hover:bg-slate-100"
             }`}
           >
             {t}
@@ -388,27 +392,36 @@ export default function EmpleadoDetalle() {
                               </span>
                             ))}
                           </td>
-                          <td className="py-2">{horasTrabajadas.toFixed(1)}</td>
+                          <td className="py-2">
+                            {horasTrabajadas.toFixed(1)}
+                            {d.horasManual && <span className="ml-1 text-[10px] text-accent-dark align-middle">(manual)</span>}
+                          </td>
                           <td className="py-2">{d.horasExtra50 > 0 ? d.horasExtra50.toFixed(1) : "-"}</td>
                           <td className="py-2">{d.horasExtra100 > 0 ? d.horasExtra100.toFixed(1) : "-"}</td>
                           <td className="py-2">
                             {esDomingoOFeriado ? (
-                              <span className="text-purple-700">
+                              <span className="text-accent-dark">
                                 {d.tipoDia === "DOMINGO" ? "Domingo" : "Feriado"} ({horasTrabajadas.toFixed(1)}hs)
                               </span>
                             ) : (
                               d.tipoDia
                             )}
                           </td>
-                          <td className="py-2 text-right">
+                          <td className="py-2 text-right whitespace-nowrap">
+                            <button
+                              onClick={() => setDiaEnEdicion(d)}
+                              className="text-slate-500 hover:text-primary text-xs underline mr-3"
+                            >
+                              Corregir
+                            </button>
                             {tieneExtras &&
                               (d.extrasValidadas ? (
-                                <span className="text-emerald-700 text-xs">✓ Validado</span>
+                                <span className="text-primary-dark text-xs">✓ Validado</span>
                               ) : (
                                 <button
                                   onClick={() => validar.mutate(d.fecha)}
                                   disabled={validar.isPending}
-                                  className="bg-emerald-600 text-white text-xs px-3 py-1.5 rounded-md hover:bg-emerald-700 disabled:opacity-50"
+                                  className="bg-primary text-white text-xs px-3 py-1.5 rounded-md hover:bg-primary-dark disabled:opacity-50"
                                 >
                                   Validar
                                 </button>
@@ -458,7 +471,7 @@ export default function EmpleadoDetalle() {
                   type="button"
                   onClick={() => setNuevaAusencia({ ...nuevaAusencia, justificada: true })}
                   className={`flex-1 py-1.5 rounded-md text-sm ${
-                    nuevaAusencia.justificada ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600"
+                    nuevaAusencia.justificada ? "bg-primary text-white" : "bg-slate-100 text-slate-600"
                   }`}
                 >
                   Justificada
@@ -507,7 +520,7 @@ export default function EmpleadoDetalle() {
                     (nuevaAusencia.justificada && nuevaAusencia.tipo === "OTRA" && !nuevaAusencia.observaciones.trim()) ||
                     crearAusencia.isPending
                   }
-                  className="bg-slate-900 text-white text-sm px-4 py-2 rounded-md hover:bg-slate-800 disabled:opacity-50"
+                  className="bg-primary text-white text-sm px-4 py-2 rounded-md hover:bg-primary-dark disabled:opacity-50"
                 >
                   {crearAusencia.isPending ? "Guardando..." : "Registrar"}
                 </button>
@@ -552,7 +565,7 @@ export default function EmpleadoDetalle() {
               </div>
               <div>
                 <div className="text-sm text-slate-500">Días restantes</div>
-                <div className="text-2xl font-semibold text-emerald-600">{vacaciones.restantes}</div>
+                <div className="text-2xl font-semibold text-primary">{vacaciones.restantes}</div>
               </div>
             </div>
             <table className="w-full text-sm">
@@ -597,6 +610,21 @@ export default function EmpleadoDetalle() {
           </table>
         )}
       </div>
+
+      {diaEnEdicion && empleado && (
+        <FichadaEditModal
+          employeeId={empleado.id}
+          empleadoNombre={`${empleado.apellido}, ${empleado.nombre}`}
+          fecha={diaEnEdicion.fecha.slice(0, 10)}
+          fichadas={diaEnEdicion.fichadas}
+          horasNormales={diaEnEdicion.horasNormales}
+          horasExtra50={diaEnEdicion.horasExtra50}
+          horasExtra100={diaEnEdicion.horasExtra100}
+          horasManual={diaEnEdicion.horasManual}
+          onClose={() => setDiaEnEdicion(null)}
+          onSaved={() => queryClient.invalidateQueries({ queryKey: ["asistencia-empleado", id] })}
+        />
+      )}
     </div>
   );
 }

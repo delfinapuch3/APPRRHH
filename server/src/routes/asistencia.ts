@@ -184,4 +184,35 @@ router.put("/validar", requireAdmin, async (req, res) => {
   res.json(calculo);
 });
 
+const horasManualSchema = z.object({
+  employeeId: z.string().min(1),
+  fecha: z.coerce.date(),
+  horasTrabajadas: z.number().min(0).max(24).nullable(),
+});
+router.put("/horas-manual", requireAdmin, async (req, res) => {
+  const parsed = horasManualSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const { employeeId, fecha, horasTrabajadas } = parsed.data;
+  const dia = utcDateOnlyFrom(fecha);
+
+  if (horasTrabajadas === null) {
+    await prisma.dailyCalculation.update({
+      where: { employeeId_fecha: { employeeId, fecha: dia } },
+      data: { horasManual: false },
+    });
+    await recalcularEmpleadoPeriodo(employeeId, dia, dia);
+    const calculo = await prisma.dailyCalculation.findUnique({ where: { employeeId_fecha: { employeeId, fecha: dia } } });
+    return res.json(calculo);
+  }
+
+  const existente = await prisma.dailyCalculation.findUnique({ where: { employeeId_fecha: { employeeId, fecha: dia } } });
+  if (!existente) return res.status(404).json({ error: "No hay cálculo para ese día" });
+  const horasNormales = Math.max(0, horasTrabajadas - existente.horasExtra50 - existente.horasExtra100);
+  const calculo = await prisma.dailyCalculation.update({
+    where: { employeeId_fecha: { employeeId, fecha: dia } },
+    data: { horasNormales, horasManual: true, ausente: false },
+  });
+  res.json(calculo);
+});
+
 export default router;

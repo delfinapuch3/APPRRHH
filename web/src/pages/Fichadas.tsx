@@ -152,14 +152,14 @@ export default function Fichadas() {
                   <button
                     type="button"
                     onClick={() => setMapping({ ...mapping, modo: "separado" })}
-                    className={`flex-1 py-1.5 rounded-md text-sm ${mapping.modo === "separado" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600"}`}
+                    className={`flex-1 py-1.5 rounded-md text-sm ${mapping.modo === "separado" ? "bg-primary text-white" : "bg-slate-100 text-slate-600"}`}
                   >
                     Entrada y salida en columnas separadas
                   </button>
                   <button
                     type="button"
                     onClick={() => setMapping({ ...mapping, modo: "combinado" })}
-                    className={`flex-1 py-1.5 rounded-md text-sm ${mapping.modo === "combinado" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600"}`}
+                    className={`flex-1 py-1.5 rounded-md text-sm ${mapping.modo === "combinado" ? "bg-primary text-white" : "bg-slate-100 text-slate-600"}`}
                   >
                     Una columna combinada (ej: "E 08:07 - S 15:56")
                   </button>
@@ -264,7 +264,7 @@ export default function Fichadas() {
                   (mapping.modo === "combinado" ? !mapping.marcaciones : !mapping.horaEntrada) ||
                   confirmMutation.isPending
                 }
-                className="bg-slate-900 text-white text-sm px-4 py-2 rounded-md hover:bg-slate-800 disabled:opacity-50"
+                className="bg-primary text-white text-sm px-4 py-2 rounded-md hover:bg-primary-dark disabled:opacity-50"
               >
                 {confirmMutation.isPending ? "Importando..." : "Confirmar importación"}
               </button>
@@ -276,7 +276,7 @@ export default function Fichadas() {
 
           {importResult && (
             <div className="mt-4 text-sm">
-              <p className="text-emerald-700">{importResult.insertados} fichadas importadas.</p>
+              <p className="text-primary-dark">{importResult.insertados} fichadas importadas.</p>
               {importResult.errores.length > 0 && (
                 <details className="mt-2">
                   <summary className="text-red-600 cursor-pointer">{importResult.errores.length} filas con error</summary>
@@ -347,7 +347,7 @@ export default function Fichadas() {
                 />
               </div>
             </div>
-            <button type="submit" className="bg-slate-900 text-white text-sm px-4 py-2 rounded-md hover:bg-slate-800">
+            <button type="submit" className="bg-primary text-white text-sm px-4 py-2 rounded-md hover:bg-primary-dark">
               Guardar fichada
             </button>
           </form>
@@ -375,9 +375,9 @@ export default function Fichadas() {
                   {f.employee.apellido}, {f.employee.nombre}
                 </td>
                 <td className="py-2">{new Date(f.fecha).toLocaleDateString("es-AR", { timeZone: "UTC" })}</td>
-                <td className="py-2">{new Date(f.horaEntrada).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</td>
+                <td className="py-2">{new Date(f.horaEntrada).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false })}</td>
                 <td className="py-2">
-                  {f.horaSalida ? new Date(f.horaSalida).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) : "-"}
+                  {f.horaSalida ? new Date(f.horaSalida).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }) : "-"}
                 </td>
                 <td className="py-2">{f.origen}</td>
               </tr>

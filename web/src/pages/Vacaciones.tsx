@@ -80,7 +80,7 @@ export default function Vacaciones() {
             </div>
             <div className="bg-white rounded-lg shadow-sm p-5">
               <div className="text-sm text-slate-500">Días restantes</div>
-              <div className="text-3xl font-semibold text-emerald-600 mt-1">{balance.restantes}</div>
+              <div className="text-3xl font-semibold text-primary mt-1">{balance.restantes}</div>
             </div>
           </div>
 
@@ -123,7 +123,7 @@ export default function Vacaciones() {
                   className="border border-slate-300 rounded-md px-2 py-1.5 text-sm w-20"
                 />
               </div>
-              <button type="submit" className="bg-slate-900 text-white text-sm px-4 py-2 rounded-md hover:bg-slate-800">
+              <button type="submit" className="bg-primary text-white text-sm px-4 py-2 rounded-md hover:bg-primary-dark">
                 Guardar
               </button>
             </form>

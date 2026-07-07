@@ -115,7 +115,7 @@ function Logo({ width = 150 }: { width?: number }) {
 
 /* ─── Nav Icons ─── */
 function stroke(active?: boolean) {
-  return active ? "#F59E0B" : "#475569";
+  return active ? "#46B869" : "#475569";
 }
 
 function IconDash({ active }: IconProps) {

@@ -28,7 +28,7 @@ export default function Francos() {
           <button
             key={e}
             onClick={() => setEstado(e)}
-            className={`px-3 py-1.5 rounded-md text-sm ${estado === e ? "bg-slate-900 text-white" : "bg-white text-slate-600"}`}
+            className={`px-3 py-1.5 rounded-md text-sm ${estado === e ? "bg-primary text-white" : "bg-white text-slate-600"}`}
           >
             {e || "Todos"}
           </button>

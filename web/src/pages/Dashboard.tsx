@@ -211,7 +211,7 @@ export default function Dashboard() {
           titulo="Presentes"
           cantidad={resumen?.presentes.cantidad ?? 0}
           porcentaje={resumen?.presentes.porcentaje ?? 0}
-          bg="bg-emerald-500"
+          bg="bg-primary"
           ring="#0f5132"
           icon={ICONO_PRESENTE}
         />
@@ -227,7 +227,7 @@ export default function Dashboard() {
           titulo="Tardes"
           cantidad={resumen?.tardes.cantidad ?? 0}
           porcentaje={resumen?.tardes.porcentaje ?? 0}
-          bg="bg-amber-500"
+          bg="bg-accent"
           ring="#8a5a12"
           icon={ICONO_TARDE}
         />

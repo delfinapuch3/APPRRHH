@@ -4,17 +4,28 @@ export default {
   theme: {
     extend: {
       colors: {
+        primary: {
+          DEFAULT: "#1E7D34",
+          light: "#E6F4EA",
+          dark: "#145A26",
+          tint: "#46B869",
+        },
+        accent: {
+          DEFAULT: "#E8A020",
+          light: "#FDF1DC",
+          dark: "#C17F10",
+        },
         brand: {
-          DEFAULT: "#F59E0B",
-          light: "#FEF3C7",
-          dark: "#D97706",
+          DEFAULT: "#E8A020",
+          light: "#FDF1DC",
+          dark: "#C17F10",
         },
         sidebar: {
-          bg: "#0A0F1C",
-          border: "#1E2A3A",
+          bg: "#0F1B14",
+          border: "#1C2C22",
           text: "#94A3B8",
-          hover: "#131D2E",
-          active: "#1A2840",
+          hover: "#17251C",
+          active: "#1B3325",
         },
         content: {
           bg: "#F1F5F9",

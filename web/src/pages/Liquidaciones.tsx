@@ -123,7 +123,7 @@ export default function Liquidaciones() {
           <button
             type="submit"
             disabled={generar.isPending}
-            className="bg-slate-900 text-white text-sm px-4 py-2 rounded-md hover:bg-slate-800 disabled:opacity-50"
+            className="bg-primary text-white text-sm px-4 py-2 rounded-md hover:bg-primary-dark disabled:opacity-50"
           >
             {generar.isPending ? "Generando..." : "Generar"}
           </button>

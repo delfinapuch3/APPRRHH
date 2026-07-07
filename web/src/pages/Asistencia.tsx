@@ -66,13 +66,13 @@ export default function Asistencia() {
       <div className="flex gap-2 mb-6">
         <button
           onClick={() => setVista("periodo")}
-          className={`px-4 py-2 rounded-md text-sm ${vista === "periodo" ? "bg-slate-900 text-white" : "bg-white text-slate-600"}`}
+          className={`px-4 py-2 rounded-md text-sm ${vista === "periodo" ? "bg-primary text-white" : "bg-white text-slate-600"}`}
         >
           Por período
         </button>
         <button
           onClick={() => setVista("dia")}
-          className={`px-4 py-2 rounded-md text-sm ${vista === "dia" ? "bg-slate-900 text-white" : "bg-white text-slate-600"}`}
+          className={`px-4 py-2 rounded-md text-sm ${vista === "dia" ? "bg-primary text-white" : "bg-white text-slate-600"}`}
         >
           Por día
         </button>
@@ -210,7 +210,7 @@ export default function Asistencia() {
                       <td className="py-2">{e.nombre}</td>
                       <td className="py-2">
                         {!e.ausente ? (
-                          <span className="text-emerald-700">Presente</span>
+                          <span className="text-primary-dark">Presente</span>
                         ) : e.justificada === true ? (
                           <span className="text-slate-600">Ausente · {labelTipoAusencia(e.tipoAusencia)}</span>
                         ) : e.justificada === false ? (
@@ -250,7 +250,7 @@ export default function Asistencia() {
             <div className="flex gap-2 mb-3">
               <button
                 onClick={() => setJustificada(true)}
-                className={`flex-1 py-1.5 rounded-md text-sm ${justificada ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600"}`}
+                className={`flex-1 py-1.5 rounded-md text-sm ${justificada ? "bg-primary text-white" : "bg-slate-100 text-slate-600"}`}
               >
                 Justificada
               </button>
@@ -291,7 +291,7 @@ export default function Asistencia() {
               <button
                 onClick={() => clasificar.mutate()}
                 disabled={justificada && tipo === "OTRA" && !observaciones.trim()}
-                className="bg-slate-900 text-white text-sm px-4 py-2 rounded-md hover:bg-slate-800 disabled:opacity-50"
+                className="bg-primary text-white text-sm px-4 py-2 rounded-md hover:bg-primary-dark disabled:opacity-50"
               >
                 Guardar
               </button>

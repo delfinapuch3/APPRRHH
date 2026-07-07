@@ -160,8 +160,13 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
     });
   }
 
+  // Los días marcados con horasManual fueron corregidos a mano por RRHH (ej.
+  // redondear 7.9hs a 8hs): se dejan intactos y no se pisan con el recálculo
+  // automático a partir de las fichadas.
   await prisma.$transaction(
-    results.map((r) => {
+    results
+      .filter((r) => !existentePorFecha.get(r.fecha.getTime())?.horasManual)
+      .map((r) => {
       const existente = existentePorFecha.get(r.fecha.getTime());
       const preservarValidacion =
         existente?.extrasValidadas && existente.horasExtra50 === r.horasExtra50 && existente.horasExtra100 === r.horasExtra100;

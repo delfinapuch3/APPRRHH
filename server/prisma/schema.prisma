@@ -192,6 +192,7 @@ model DailyCalculation {
   extrasValidadas Boolean       @default(false)
   validadoPorId   String?
   fechaValidacion DateTime?
+  horasManual     Boolean       @default(false)
   updatedAt       DateTime      @updatedAt
 
   employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)

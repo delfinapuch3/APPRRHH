@@ -50,8 +50,8 @@ export default function Login() {
           style={{
             position: "absolute",
             inset: 0,
-            backgroundImage: `radial-gradient(circle at 20% 80%, rgba(245,158,11,.1) 0%, transparent 50%),
-                              radial-gradient(circle at 80% 20%, rgba(34,197,94,.07) 0%, transparent 50%)`,
+            backgroundImage: `radial-gradient(circle at 20% 80%, rgba(232,160,32,.1) 0%, transparent 50%),
+                              radial-gradient(circle at 80% 20%, rgba(70,184,105,.08) 0%, transparent 50%)`,
             pointerEvents: "none",
           }}
         />
@@ -82,7 +82,7 @@ export default function Login() {
             }}
           >
             Sistema de<br />
-            <span style={{ color: "#F59E0B" }}>Gestión</span> de<br />
+            <span style={{ color: "#46B869" }}>Gestión</span> de<br />
             Operarios
           </h1>
           <p style={{ color: "#475569", fontSize: 15, lineHeight: 1.6, maxWidth: 320 }}>
@@ -91,7 +91,7 @@ export default function Login() {
           <div style={{ display: "flex", gap: 32, marginTop: 40 }}>
             {highlights.map((s) => (
               <div key={s.v}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 20, color: "#F59E0B" }}>{s.v}</div>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 20, color: "#46B869" }}>{s.v}</div>
                 <div style={{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: ".08em" }}>{s.l}</div>
               </div>
             ))}
