@@ -42,6 +42,8 @@ interface HorasExtraSector {
   sector: string;
   horasExtra50: number;
   horasExtra100: number;
+  montoExtra50: number;
+  montoExtra100: number;
 }
 
 function Gauge({ porcentaje, color }: { porcentaje: number; color: string }) {
@@ -326,6 +328,34 @@ export default function Dashboard() {
             </BarChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-sm p-5 mt-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-medium text-slate-700">Costo de horas extra por Sector ($)</h2>
+          <select
+            value={periodoExtra}
+            onChange={(e) => setPeriodoExtra(e.target.value)}
+            className="border border-slate-300 rounded-md px-2 py-1 text-xs"
+          >
+            {PERIODOS.map(([v, l]) => (
+              <option key={v} value={v}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </div>
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={horasExtraSector}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="sector" tick={{ fontSize: 12 }} />
+            <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `$${Number(v).toLocaleString("es-AR")}`} />
+            <Tooltip formatter={(v) => `$${Number(v).toLocaleString("es-AR")}`} />
+            <Legend />
+            <Bar dataKey="montoExtra50" name="Extra 50%" fill="#f59e0b" />
+            <Bar dataKey="montoExtra100" name="Extra 100%" fill="#ef4444" />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );

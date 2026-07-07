@@ -161,21 +161,36 @@ router.get("/horas-extra-por-sector", async (req, res) => {
   const sectores = await prisma.sector.findMany({
     where: { ...(empresaId ? { empresaId } : {}), ...(scope ? { id: { in: scope } } : {}) },
   });
+  const config = await prisma.payrollConfig.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
 
   const resultado = [];
   for (const sector of sectores) {
     await recalcularSectorPeriodo(sector.id, desde, hasta);
-    const empleados = await prisma.employee.findMany({ where: { sectorId: sector.id, activo: true }, select: { id: true } });
+    const empleados = await prisma.employee.findMany({
+      where: { sectorId: sector.id, activo: true },
+      select: { id: true, valorHoraNormal: true },
+    });
+    const valorHoraPorEmpleado = new Map(empleados.map((e) => [e.id, e.valorHoraNormal]));
     const calculos = await prisma.dailyCalculation.findMany({
       where: { employeeId: { in: empleados.map((e) => e.id) }, fecha: { gte: desde, lte: hasta } },
     });
     const extra50 = calculos.reduce((a, c) => a + c.horasExtra50, 0);
     const extra100 = calculos.reduce((a, c) => a + c.horasExtra100, 0);
+    const montoExtra50 = calculos.reduce(
+      (a, c) => a + c.horasExtra50 * (valorHoraPorEmpleado.get(c.employeeId) ?? 0) * config.multiplicadorExtra50,
+      0
+    );
+    const montoExtra100 = calculos.reduce(
+      (a, c) => a + c.horasExtra100 * (valorHoraPorEmpleado.get(c.employeeId) ?? 0) * config.multiplicadorExtra100,
+      0
+    );
     resultado.push({
       sectorId: sector.id,
       sector: sector.nombre,
       horasExtra50: Math.round(extra50 * 10) / 10,
       horasExtra100: Math.round(extra100 * 10) / 10,
+      montoExtra50: Math.round(montoExtra50),
+      montoExtra100: Math.round(montoExtra100),
     });
   }
 

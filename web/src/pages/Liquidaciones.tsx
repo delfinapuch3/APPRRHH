@@ -62,6 +62,26 @@ export default function Liquidaciones() {
     URL.revokeObjectURL(url);
   }
 
+  const [planilla, setPlanilla] = useState({ fechaDesde: firstOfMonth(), fechaHasta: today() });
+  const [exportandoPlanilla, setExportandoPlanilla] = useState(false);
+  async function exportarPlanillaGeneral() {
+    setExportandoPlanilla(true);
+    try {
+      const res = await api.get(
+        `/liquidaciones/export-planilla.xlsx?desde=${planilla.fechaDesde}&hasta=${planilla.fechaHasta}`,
+        { responseType: "blob" }
+      );
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `planilla-general-${planilla.fechaDesde}-a-${planilla.fechaHasta}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExportandoPlanilla(false);
+    }
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-semibold text-slate-800 mb-6">Liquidaciones</h1>
@@ -130,6 +150,37 @@ export default function Liquidaciones() {
         </form>
         {generar.isError && <p className="text-red-600 text-sm mt-2">No se pudo generar la liquidación</p>}
         {avisoSinValidar && <p className="text-amber-600 text-sm mt-2">{avisoSinValidar}</p>}
+      </div>
+
+      <div className="bg-white rounded-lg shadow-sm p-5 mb-6">
+        <h2 className="font-medium text-slate-700 mb-3">Planilla general (todo el personal)</h2>
+        <div className="flex gap-3 items-end flex-wrap">
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">Desde</label>
+            <input
+              type="date"
+              value={planilla.fechaDesde}
+              onChange={(e) => setPlanilla({ ...planilla, fechaDesde: e.target.value })}
+              className="border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">Hasta</label>
+            <input
+              type="date"
+              value={planilla.fechaHasta}
+              onChange={(e) => setPlanilla({ ...planilla, fechaHasta: e.target.value })}
+              className="border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+            />
+          </div>
+          <button
+            onClick={exportarPlanillaGeneral}
+            disabled={exportandoPlanilla}
+            className="bg-primary text-white text-sm px-4 py-2 rounded-md hover:bg-primary-dark disabled:opacity-50"
+          >
+            {exportandoPlanilla ? "Generando..." : "Exportar planilla general"}
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm p-5">

@@ -3,6 +3,22 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client.js";
 import { TIPOS_AUSENCIA, labelTipoAusencia } from "../lib/tiposAusencia.js";
 import { invalidarAsistenciaRelacionada } from "../lib/invalidarAsistencia.js";
+import FichadaEditModal from "../components/FichadaEditModal.js";
+
+interface EmpleadoDia {
+  employeeId: string;
+  legajo: string;
+  nombre: string;
+  horasNormales: number;
+  horasExtra50: number;
+  horasExtra100: number;
+  horasManual: boolean;
+  horasTrabajadas: number;
+  ausente: boolean;
+  justificada: boolean | null;
+  tipoAusencia: string | null;
+  fichadas: { id: string; horaEntrada: string; horaSalida: string | null }[];
+}
 
 function firstOfMonth() {
   const d = new Date();
@@ -37,9 +53,11 @@ export default function Asistencia() {
 
   const { data: rosterDia, isLoading: cargandoDia } = useQuery({
     queryKey: ["asistencia-dia", diaSeleccionado],
-    queryFn: async () => (await api.get(`/asistencia/dia?fecha=${diaSeleccionado}`)).data as { empleados: any[] },
+    queryFn: async () => (await api.get(`/asistencia/dia?fecha=${diaSeleccionado}`)).data as { empleados: EmpleadoDia[] },
     enabled: vista === "dia",
   });
+
+  const [empleadoEnEdicion, setEmpleadoEnEdicion] = useState<EmpleadoDia | null>(null);
 
   const clasificar = useMutation({
     mutationFn: async () =>
@@ -225,7 +243,7 @@ export default function Asistencia() {
                         {!e.ausente ? (
                           <span className="text-primary-dark">Presente</span>
                         ) : e.justificada === true ? (
-                          <span className="text-slate-600">Ausente · {labelTipoAusencia(e.tipoAusencia)}</span>
+                          <span className="text-slate-600">Ausente · {labelTipoAusencia(e.tipoAusencia ?? "")}</span>
                         ) : e.justificada === false ? (
                           <span className="text-red-600">Ausente injustificado</span>
                         ) : (
@@ -233,7 +251,13 @@ export default function Asistencia() {
                         )}
                       </td>
                       <td className="py-2">{e.horasTrabajadas.toFixed(1)}</td>
-                      <td className="py-2 text-right">
+                      <td className="py-2 text-right whitespace-nowrap">
+                        <button
+                          onClick={() => setEmpleadoEnEdicion(e)}
+                          className="text-slate-500 hover:text-primary text-xs underline mr-3"
+                        >
+                          Corregir
+                        </button>
                         {e.ausente && e.justificada === null && (
                           <button
                             onClick={() => setSeleccion({ employeeId: e.employeeId, fecha: diaSeleccionado, nombre: e.nombre })}
@@ -311,6 +335,21 @@ export default function Asistencia() {
             </div>
           </div>
         </div>
+      )}
+
+      {empleadoEnEdicion && (
+        <FichadaEditModal
+          employeeId={empleadoEnEdicion.employeeId}
+          empleadoNombre={empleadoEnEdicion.nombre}
+          fecha={diaSeleccionado}
+          fichadas={empleadoEnEdicion.fichadas}
+          horasNormales={empleadoEnEdicion.horasNormales}
+          horasExtra50={empleadoEnEdicion.horasExtra50}
+          horasExtra100={empleadoEnEdicion.horasExtra100}
+          horasManual={empleadoEnEdicion.horasManual}
+          onClose={() => setEmpleadoEnEdicion(null)}
+          onSaved={() => invalidarAsistenciaRelacionada(queryClient)}
+        />
       )}
     </div>
   );

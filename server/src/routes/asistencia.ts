@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { sectorScope, requireAdmin } from "../middleware/auth.js";
 import { recalcularSectorPeriodo, recalcularEmpleadoPeriodo } from "../engine/recalcular.js";
-import { utcDateOnlyFrom } from "../lib/dates.js";
+import { dayOfWeekUtc, utcDateOnlyFrom } from "../lib/dates.js";
 import { SECTOR_LUNES_A_VIERNES } from "../lib/constants.js";
 
 const router = Router();
@@ -76,7 +76,7 @@ router.get("/resumen", async (req, res) => {
 router.get("/dia", async (req, res) => {
   const scope = sectorScope(req);
   const { fecha, sectorId } = req.query as Record<string, string | undefined>;
-  const dia = fecha ? new Date(fecha) : new Date();
+  const dia = fecha ? utcDateOnlyFrom(new Date(fecha)) : utcDateOnlyFrom(new Date());
 
   const effectiveSectorId = scope ? (scope.includes(sectorId ?? "") ? sectorId! : scope[0] ?? null) : sectorId ?? null;
   await recalcularSectorPeriodo(effectiveSectorId, dia, dia);
@@ -86,30 +86,52 @@ router.get("/dia", async (req, res) => {
       activo: true,
       ...(scope ? { sectorId: { in: scope } } : sectorId ? { sectorId } : {}),
     },
+    include: { sector: { select: { nombre: true } } },
     orderBy: [{ apellido: "asc" }, { nombre: "asc" }],
   });
 
-  const calculos = await prisma.dailyCalculation.findMany({
-    where: { employeeId: { in: empleados.map((e) => e.id) }, fecha: dia },
-  });
+  const empleadoIds = empleados.map((e) => e.id);
+  const [calculos, fichadas] = await Promise.all([
+    prisma.dailyCalculation.findMany({ where: { employeeId: { in: empleadoIds }, fecha: dia } }),
+    prisma.timeRecord.findMany({ where: { employeeId: { in: empleadoIds }, fecha: dia } }),
+  ]);
   const porEmpleado = new Map(calculos.map((c) => [c.employeeId, c]));
+  const fichadasPorEmpleado = new Map<string, typeof fichadas>();
+  for (const f of fichadas) {
+    if (!fichadasPorEmpleado.has(f.employeeId)) fichadasPorEmpleado.set(f.employeeId, []);
+    fichadasPorEmpleado.get(f.employeeId)!.push(f);
+  }
 
-  const roster = empleados.map((emp) => {
-    const c = porEmpleado.get(emp.id);
-    const horasTrabajadas = c ? c.horasNormales + c.horasExtra50 + c.horasExtra100 : 0;
-    return {
-      employeeId: emp.id,
-      legajo: emp.legajo,
-      nombre: `${emp.apellido}, ${emp.nombre}`,
-      sectorId: emp.sectorId,
-      tipoDia: c?.tipoDia ?? null,
-      horasTrabajadas,
-      ausente: c?.ausente ?? false,
-      justificada: c?.justificada ?? null,
-      tipoAusencia: c?.tipoAusencia ?? null,
-      observaciones: c?.observaciones ?? null,
-    };
-  });
+  const dow = dayOfWeekUtc(dia);
+
+  const roster = empleados
+    .map((emp) => {
+      const c = porEmpleado.get(emp.id);
+      const horasTrabajadas = c ? c.horasNormales + c.horasExtra50 + c.horasExtra100 : 0;
+      const trabajaLunesAViernesNomas = emp.sector?.nombre === SECTOR_LUNES_A_VIERNES;
+      const esDiaNoLaboral = dow === 0 || (dow === 6 && trabajaLunesAViernesNomas);
+      return {
+        employeeId: emp.id,
+        legajo: emp.legajo,
+        nombre: `${emp.apellido}, ${emp.nombre}`,
+        sectorId: emp.sectorId,
+        tipoDia: c?.tipoDia ?? null,
+        horasNormales: c?.horasNormales ?? 0,
+        horasExtra50: c?.horasExtra50 ?? 0,
+        horasExtra100: c?.horasExtra100 ?? 0,
+        horasManual: c?.horasManual ?? false,
+        horasTrabajadas,
+        ausente: c?.ausente ?? false,
+        justificada: c?.justificada ?? null,
+        tipoAusencia: c?.tipoAusencia ?? null,
+        observaciones: c?.observaciones ?? null,
+        fichadas: fichadasPorEmpleado.get(emp.id) ?? [],
+        esDiaNoLaboral,
+      };
+    })
+    // Días que no le tocan a nadie (domingo para todos, sábado para Administración): si
+    // no vino a trabajar ese día, ni siquiera tiene sentido mostrarlo como "presente".
+    .filter((r) => !r.esDiaNoLaboral || r.horasTrabajadas > 0 || r.fichadas.length > 0);
 
   res.json({ fecha: dia, empleados: roster });
 });

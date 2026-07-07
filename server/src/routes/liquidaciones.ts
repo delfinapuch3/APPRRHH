@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import { prisma } from "../db.js";
 import { requireAdmin } from "../middleware/auth.js";
 import { recalcularEmpleadoPeriodo } from "../engine/recalcular.js";
+import { sendXlsx } from "../lib/xlsxExport.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -16,6 +17,70 @@ router.get("/", async (req, res) => {
     orderBy: { fechaDesde: "desc" },
   });
   res.json(liquidaciones);
+});
+
+router.get("/export-planilla.xlsx", async (req, res) => {
+  const { desde, hasta } = req.query as Record<string, string | undefined>;
+  if (!desde || !hasta) return res.status(400).json({ error: "Faltan desde/hasta" });
+  const fechaDesde = new Date(desde);
+  const fechaHasta = new Date(hasta);
+
+  const empleados = await prisma.employee.findMany({ where: { activo: true }, orderBy: [{ apellido: "asc" }, { nombre: "asc" }] });
+  const config = await prisma.payrollConfig.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
+
+  const filas: unknown[][] = [
+    [
+      "Nombre",
+      "Legajo",
+      "Horas normales",
+      "H. Extra 50%",
+      "H. Extra 100%",
+      "Franco comp.",
+      "$ Hora normal",
+      "$ Extra 50%",
+      "$ Extra 100%",
+      "$ Franco comp.",
+      "$ Total",
+    ],
+  ];
+
+  for (const empleado of empleados) {
+    await recalcularEmpleadoPeriodo(empleado.id, fechaDesde, fechaHasta);
+    const [dias, francos] = await Promise.all([
+      prisma.dailyCalculation.findMany({ where: { employeeId: empleado.id, fecha: { gte: fechaDesde, lte: fechaHasta } } }),
+      prisma.francoCompensatorio.findMany({
+        where: { employeeId: empleado.id, fechaGenerado: { gte: fechaDesde, lte: fechaHasta } },
+      }),
+    ]);
+
+    const horasNormales = dias.reduce((a, d) => a + d.horasNormales, 0);
+    const diasValidados = dias.filter((d) => d.extrasValidadas);
+    const horasExtra50 = diasValidados.reduce((a, d) => a + d.horasExtra50, 0);
+    const horasExtra100 = diasValidados.reduce((a, d) => a + d.horasExtra100, 0);
+    const horasFranco = francos.reduce((a, f) => a + f.horas, 0);
+
+    const montoNormal = horasNormales * empleado.valorHoraNormal;
+    const montoExtra50 = horasExtra50 * empleado.valorHoraNormal * config.multiplicadorExtra50;
+    const montoExtra100 = horasExtra100 * empleado.valorHoraNormal * config.multiplicadorExtra100;
+    const montoFranco = horasFranco * empleado.valorHoraNormal;
+    const montoTotal = montoNormal + montoExtra50 + montoExtra100 + montoFranco;
+
+    filas.push([
+      `${empleado.apellido}, ${empleado.nombre}`,
+      empleado.legajo,
+      Math.round(horasNormales * 10) / 10,
+      Math.round(horasExtra50 * 10) / 10,
+      Math.round(horasExtra100 * 10) / 10,
+      Math.round(horasFranco * 10) / 10,
+      Math.round(montoNormal),
+      Math.round(montoExtra50),
+      Math.round(montoExtra100),
+      Math.round(montoFranco),
+      Math.round(montoTotal),
+    ]);
+  }
+
+  sendXlsx(res, `planilla-general-${desde}-a-${hasta}.xlsx`, "Planilla general", filas);
 });
 
 router.get("/:id", async (req, res) => {
