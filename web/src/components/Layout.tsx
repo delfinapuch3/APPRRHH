@@ -53,8 +53,8 @@ export function Layout() {
 
       {/* Sidebar */}
       <aside className={`sidebar${open ? " open" : ""}`}>
-        <div className="px-4 pt-5 pb-4 border-b border-sidebar-border">
-          <Logo width={150} />
+        <div className="px-4 pt-5 pb-4 border-b border-sidebar-border text-center">
+          <Logo width={140} />
           <div className="mt-1.5 text-[10px] text-center uppercase tracking-[.06em] text-sidebar-text/70">
             Gestión de Operarios
           </div>
@@ -110,7 +110,11 @@ export function Layout() {
 }
 
 function Logo({ width = 150 }: { width?: number }) {
-  return <img src="/logo.svg" alt="POLYSAN / POLCECAL" width={width} style={{ objectFit: "contain" }} />;
+  return (
+    <div className="bg-white rounded-lg p-2 inline-block">
+      <img src="/logo.png" alt="POLYSAN S.A. / POLCECAL S.A." style={{ width, display: "block" }} />
+    </div>
+  );
 }
 
 /* ─── Nav Icons ─── */
