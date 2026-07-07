@@ -145,7 +145,6 @@ export default function Liquidaciones() {
                 <th className="pb-2">Hs. normales</th>
                 <th className="pb-2">Hs. extra 50%</th>
                 <th className="pb-2">Hs. extra 100%</th>
-                <th className="pb-2">Francos</th>
                 <th className="pb-2">Total</th>
                 <th className="pb-2">Estado</th>
                 <th className="pb-2"></th>
@@ -165,7 +164,6 @@ export default function Liquidaciones() {
                   <td className="py-2">{l.horasNormales.toFixed(1)}</td>
                   <td className="py-2">{l.horasExtra50.toFixed(1)}</td>
                   <td className="py-2">{l.horasExtra100.toFixed(1)}</td>
-                  <td className="py-2">{l.cantidadFrancosPagados}</td>
                   <td className="py-2 font-medium">${l.totalBruto.toLocaleString("es-AR", { maximumFractionDigits: 0 })}</td>
                   <td className="py-2">{l.estado}</td>
                   <td className="py-2 text-right">

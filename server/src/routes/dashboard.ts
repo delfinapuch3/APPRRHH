@@ -135,7 +135,7 @@ router.get("/horas-por-sector", async (req, res) => {
     const horasTrabajadas = calculos.reduce((a, c) => a + c.horasNormales + c.horasExtra50 + c.horasExtra100, 0);
     const diasEsperadosPorEmpleado = new Map<string, number>();
     for (const c of calculos) {
-      if (c.tipoDia !== "DOMINGO") {
+      if (c.tipoDia !== "DOMINGO" && !(sector.trabajaSabados === false && c.tipoDia === "SABADO")) {
         diasEsperadosPorEmpleado.set(c.employeeId, (diasEsperadosPorEmpleado.get(c.employeeId) ?? 0) + 1);
       }
     }

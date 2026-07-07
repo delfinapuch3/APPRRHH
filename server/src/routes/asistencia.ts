@@ -32,6 +32,7 @@ router.get("/resumen", async (req, res) => {
       activo: true,
       ...(scope ? { sectorId: { in: scope } } : sectorId ? { sectorId } : {}),
     },
+    include: { sector: { select: { trabajaSabados: true } } },
   });
 
   const empleadoIds = empleados.map((e) => e.id);
@@ -40,8 +41,9 @@ router.get("/resumen", async (req, res) => {
   });
 
   const porEmpleado = empleados.map((emp) => {
+    const noTrabajaSabados = emp.sector?.trabajaSabados === false;
     const dias = calculos.filter((c) => c.employeeId === emp.id);
-    const diasEsperados = dias.filter((d) => d.tipoDia !== "DOMINGO").length;
+    const diasEsperados = dias.filter((d) => d.tipoDia !== "DOMINGO" && !(noTrabajaSabados && d.tipoDia === "SABADO")).length;
     const ausenciasInjustificadas = dias.filter((d) => d.ausente && d.justificada === false).length;
     const ausenciasSinClasificar = dias.filter((d) => d.ausente && d.justificada === null).length;
     const ausenciasJustificadas = dias.filter((d) => d.ausente && d.justificada === true).length;

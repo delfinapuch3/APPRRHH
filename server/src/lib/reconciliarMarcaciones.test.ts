@@ -60,6 +60,28 @@ describe("reconciliarMarcaciones", () => {
     expect(turnos).toEqual([{ fecha: dia(2026, 6, 30), entradaStr: "20:00", salidaStr: null, fechaSalida: dia(2026, 6, 30) }]);
   });
 
+  it("turno abierto de una importación anterior se cierra con el primer dato de la nueva (abiertoPrevio)", () => {
+    const { turnos, avisos } = reconciliarMarcaciones(
+      [{ fecha: dia(2026, 6, 2), raw: "E 03:40 - S 19:37" }],
+      { fecha: dia(2026, 6, 1), entradaStr: "19:40" }
+    );
+    expect(turnos[0]).toEqual({ fecha: dia(2026, 6, 1), entradaStr: "19:40", salidaStr: "03:40", fechaSalida: dia(2026, 6, 2) });
+    expect(turnos[1]).toEqual({ fecha: dia(2026, 6, 2), entradaStr: "19:37", salidaStr: null, fechaSalida: dia(2026, 6, 2) });
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0].fecha).toEqual(dia(2026, 6, 2));
+  });
+
+  it("turno abierto de una importación anterior que sigue sin cerrar queda como aviso, no se fuerza", () => {
+    const { turnos, avisos } = reconciliarMarcaciones(
+      [{ fecha: dia(2026, 6, 10), raw: "E 11:40 - S 19:41" }],
+      { fecha: dia(2026, 6, 1), entradaStr: "03:33" }
+    );
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0].fecha).toEqual(dia(2026, 6, 1));
+    expect(turnos[0]).toEqual({ fecha: dia(2026, 6, 1), entradaStr: "03:33", salidaStr: null, fechaSalida: dia(2026, 6, 1) });
+    expect(turnos[1]).toEqual({ fecha: dia(2026, 6, 10), entradaStr: "11:40", salidaStr: "19:41", fechaSalida: dia(2026, 6, 10) });
+  });
+
   it("corte de almuerzo se mantiene igual (varios pares en un mismo día)", () => {
     const { turnos } = reconciliarMarcaciones([{ fecha: dia(2026, 6, 1), raw: "E 08:00 - S 12:00  E 13:00 - S 17:00" }]);
     expect(turnos).toEqual([

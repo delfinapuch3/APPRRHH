@@ -69,7 +69,8 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
 
   // Se trae un día extra hacia atrás para poder partir correctamente los
   // turnos que arrancaron el día anterior al rango pedido y cruzan medianoche.
-  const [fichadas, ausencias, vacaciones, feriados] = await Promise.all([
+  const [empleado, fichadas, ausencias, vacaciones, feriados] = await Promise.all([
+    prisma.employee.findUnique({ where: { id: employeeId }, select: { sector: { select: { trabajaSabados: true } } } }),
     prisma.timeRecord.findMany({
       where: { employeeId, fecha: { gte: addUtcDays(startOfDay(desde), -1), lte: startOfDay(hasta) } },
     }),
@@ -83,6 +84,8 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
       where: { fecha: { gte: startOfDay(desde), lte: startOfDay(hasta) } },
     }),
   ]);
+  // Sin sector asignado, se asume que sí trabaja sábados (comportamiento default).
+  const noTrabajaSabados = empleado?.sector?.trabajaSabados === false;
 
   const feriadosSet = new Set(feriados.map((f) => startOfDay(f.fecha).getTime()));
 
@@ -114,6 +117,7 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
 
     const dow = dayOfWeekUtc(dia);
     const esDomingoLibre = dow === 0; // domingo es franco semanal, no cuenta como ausencia si no trabajó
+    const esSabadoNoLaboral = dow === 6 && noTrabajaSabados; // ej. Administración: solo trabaja de lunes a viernes
 
     // Hay fichada ese día si arrancó (o siguió) alguna marcación en este día calendario,
     // esté o no completa: una marcación sin salida (abierta) igual demuestra que vino a trabajar.
@@ -130,7 +134,7 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
     let tipoAusencia: string | null = null;
     let observaciones: string | null = null;
 
-    if (!tieneFichada && !esDomingoLibre) {
+    if (!tieneFichada && !esDomingoLibre && !esSabadoNoLaboral) {
       if (vacacion) {
         ausente = false; // día de vacaciones, no es falta
       } else if (ausenciaCargada) {

@@ -355,7 +355,23 @@ export default function Fichadas() {
       </div>
 
       <div className="bg-white rounded-lg shadow-sm p-5">
-        <h2 className="font-medium text-slate-700 mb-3">Últimas fichadas</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-medium text-slate-700">Últimas fichadas</h2>
+          <button
+            onClick={async () => {
+              const res = await api.get("/fichadas/export.xlsx", { responseType: "blob" });
+              const url = URL.createObjectURL(res.data as Blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "fichadas.xlsx";
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="text-sm text-primary hover:underline"
+          >
+            Exportar
+          </button>
+        </div>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-slate-500 border-b">

@@ -4,7 +4,7 @@ import multer from "multer";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import { recalcularEmpleadoPeriodo } from "../engine/recalcular.js";
-import { localDateTime } from "../lib/dates.js";
+import { formatHHMM, localDateTime } from "../lib/dates.js";
 import {
   horaStringToDate,
   parseWorkbookAllSheets,
@@ -177,10 +177,33 @@ router.post("/confirm", async (req, res) => {
         }
       }
 
+      // Si de una importación anterior quedó un turno sin marcación de salida
+      // (típico de un turno nocturno cuyo cierre cae en el archivo siguiente),
+      // se encadena acá para que el primer dato de este archivo pueda cerrarlo
+      // en vez de quedar abierto para siempre.
+      const abierto = await prisma.timeRecord.findFirst({
+        where: { employeeId, horaSalida: null, fecha: { lt: filas[0].fecha } },
+        orderBy: { fecha: "desc" },
+      });
+      const abiertoPrevio = abierto ? { fecha: abierto.fecha, entradaStr: formatHHMM(abierto.horaEntrada) } : null;
+
       const dias = filas.map((f) => ({ fecha: f.fecha, raw: String(f.row[mapping.marcaciones ?? ""] ?? "").trim() }));
-      const { turnos, avisos } = reconciliarMarcaciones(dias);
+      const { turnos, avisos } = reconciliarMarcaciones(dias, abiertoPrevio);
 
       for (const turno of turnos) {
+        if (abierto && turno.fecha.getTime() === abierto.fecha.getTime()) {
+          // Es el turno que ya existía abierto en la base, no una fila nueva.
+          if (turno.salidaStr) {
+            await prisma.timeRecord.update({
+              where: { id: abierto.id },
+              data: { horaSalida: horaStringToDate(turno.fechaSalida, turno.salidaStr) },
+            });
+            marcarRango(employeeId, turno.fecha);
+            marcarRango(employeeId, turno.fechaSalida);
+          }
+          // si sigue sin poder cerrarse, se deja como estaba (no se duplica la fila)
+          continue;
+        }
         created.push({
           employeeId,
           fecha: turno.fecha,

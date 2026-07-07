@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client.js";
 
-const ESTADOS = ["PENDIENTE", "TOMADO", "PAGADO"] as const;
+const ESTADOS = ["PENDIENTE", "TOMADO"] as const;
 
 export default function Francos() {
   const queryClient = useQueryClient();
@@ -19,9 +19,24 @@ export default function Francos() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["francos-list"] }),
   });
 
+  async function exportar() {
+    const res = await api.get(`/francos/export.xlsx${estado ? `?estado=${estado}` : ""}`, { responseType: "blob" });
+    const url = URL.createObjectURL(res.data as Blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "francos.xlsx";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-slate-800 mb-6">Francos compensatorios</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-semibold text-slate-800">Francos compensatorios</h1>
+        <button onClick={exportar} className="text-sm text-primary hover:underline">
+          Exportar
+        </button>
+      </div>
 
       <div className="mb-4 flex gap-2">
         {["", ...ESTADOS].map((e) => (

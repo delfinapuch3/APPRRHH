@@ -21,7 +21,7 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   const liquidacion = await prisma.payrollPeriod.findUnique({
     where: { id: req.params.id },
-    include: { employee: true, francos: true },
+    include: { employee: true },
   });
   if (!liquidacion) return res.status(404).json({ error: "No encontrada" });
   res.json(liquidacion);
@@ -32,13 +32,12 @@ const generarSchema = z.object({
   tipo: z.enum(["QUINCENAL", "MENSUAL"]),
   fechaDesde: z.coerce.date(),
   fechaHasta: z.coerce.date(),
-  francoIdsAPagar: z.array(z.string()).optional(),
 });
 
 router.post("/generar", async (req, res) => {
   const parsed = generarSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const { employeeId, tipo, fechaDesde, fechaHasta, francoIdsAPagar } = parsed.data;
+  const { employeeId, tipo, fechaDesde, fechaHasta } = parsed.data;
 
   const empleado = await prisma.employee.findUnique({ where: { id: employeeId } });
   if (!empleado) return res.status(404).json({ error: "Empleado no encontrado" });
@@ -64,15 +63,7 @@ router.post("/generar", async (req, res) => {
   const montoNormal = horasNormales * empleado.valorHoraNormal;
   const montoExtra50 = horasExtra50 * empleado.valorHoraNormal * config.multiplicadorExtra50;
   const montoExtra100 = horasExtra100 * empleado.valorHoraNormal * config.multiplicadorExtra100;
-
-  let francos: { id: string; horas: number }[] = [];
-  if (francoIdsAPagar?.length) {
-    francos = await prisma.francoCompensatorio.findMany({
-      where: { id: { in: francoIdsAPagar }, employeeId, estado: "PENDIENTE" },
-    });
-  }
-  const montoFrancos = francos.reduce((a, f) => a + f.horas * empleado.valorHoraNormal, 0);
-  const totalBruto = montoNormal + montoExtra50 + montoExtra100 + montoFrancos;
+  const totalBruto = montoNormal + montoExtra50 + montoExtra100;
 
   const liquidacion = await prisma.payrollPeriod.create({
     data: {
@@ -83,22 +74,13 @@ router.post("/generar", async (req, res) => {
       horasNormales,
       horasExtra50,
       horasExtra100,
-      cantidadFrancosPagados: francos.length,
       montoNormal,
       montoExtra50,
       montoExtra100,
-      montoFrancos,
       totalBruto,
       generadoPorId: req.user!.id,
     },
   });
-
-  if (francos.length) {
-    await prisma.francoCompensatorio.updateMany({
-      where: { id: { in: francos.map((f) => f.id) } },
-      data: { estado: "PAGADO", liquidacionId: liquidacion.id },
-    });
-  }
 
   res.status(201).json({
     ...liquidacion,
@@ -117,10 +99,6 @@ router.put("/:id/cerrar", async (req, res) => {
 });
 
 router.delete("/:id", async (req, res) => {
-  await prisma.francoCompensatorio.updateMany({
-    where: { liquidacionId: req.params.id },
-    data: { estado: "PENDIENTE", liquidacionId: null },
-  });
   await prisma.payrollPeriod.delete({ where: { id: req.params.id } });
   res.status(204).end();
 });
@@ -142,7 +120,6 @@ router.get("/:id/export.xlsx", async (req, res) => {
     ["Horas normales", liquidacion.horasNormales, liquidacion.montoNormal],
     ["Horas extra 50%", liquidacion.horasExtra50, liquidacion.montoExtra50],
     ["Horas extra 100%", liquidacion.horasExtra100, liquidacion.montoExtra100],
-    ["Francos compensatorios pagados", liquidacion.cantidadFrancosPagados, liquidacion.montoFrancos],
     [],
     ["Total bruto", "", liquidacion.totalBruto],
   ];

@@ -89,8 +89,22 @@ export default function Asistencia() {
               <label className="block text-xs text-slate-500 mb-1">Hasta</label>
               <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="border border-slate-300 rounded-md px-2 py-1.5 text-sm" />
             </div>
-            <div className="text-sm text-slate-500 ml-auto">
+            <div className="text-sm text-slate-500 ml-auto flex items-center gap-4">
               % asistencia general: <span className="font-semibold text-slate-800">{resumen?.porcentajeGeneral ?? "-"}%</span>
+              <button
+                onClick={async () => {
+                  const res = await api.get(`/ausencias/export.xlsx?desde=${desde}&hasta=${hasta}`, { responseType: "blob" });
+                  const url = URL.createObjectURL(res.data as Blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "ausencias.xlsx";
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="text-primary hover:underline"
+              >
+                Exportar ausencias
+              </button>
             </div>
           </div>
 

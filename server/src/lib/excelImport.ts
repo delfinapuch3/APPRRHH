@@ -173,14 +173,22 @@ const MAX_HORAS_TURNO_CRUCE = 14;
  * ejemplo porque hay varios días sin datos en el medio, o la marcación de
  * salida simplemente nunca se registró), se deja como marcación faltante
  * para revisión manual.
+ *
+ * `abiertoPrevio` permite encadenar una fichada que quedó abierta en una
+ * importación anterior (turno nocturno cuyo cierre cayó en el archivo
+ * siguiente, subido después): se trata como si fuera el turno pendiente del
+ * "día anterior" a este lote, para que el primer dato nuevo pueda cerrarlo.
  */
-export function reconciliarMarcaciones(dias: DiaMarcacionesCrudo[]): {
+export function reconciliarMarcaciones(
+  dias: DiaMarcacionesCrudo[],
+  abiertoPrevio?: { fecha: Date; entradaStr: string } | null
+): {
   turnos: TurnoResuelto[];
   avisos: AvisoReconciliacion[];
 } {
   const turnos: TurnoResuelto[] = [];
   const avisos: AvisoReconciliacion[] = [];
-  let pendiente: { fecha: Date; entradaStr: string } | null = null;
+  let pendiente: { fecha: Date; entradaStr: string } | null = abiertoPrevio ?? null;
 
   function cerrarPendienteComoAbierto(mensaje: string) {
     if (!pendiente) return;

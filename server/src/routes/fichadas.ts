@@ -3,10 +3,11 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { sectorScope } from "../middleware/auth.js";
 import { recalcularEmpleadoPeriodo } from "../engine/recalcular.js";
+import { sendXlsx } from "../lib/xlsxExport.js";
 
 const router = Router();
 
-router.get("/", async (req, res) => {
+function buildWhere(req: import("express").Request) {
   const scope = sectorScope(req);
   const { employeeId, desde, hasta } = req.query as Record<string, string | undefined>;
   const where: Record<string, unknown> = {};
@@ -20,13 +21,37 @@ router.get("/", async (req, res) => {
   if (scope) {
     where.employee = { sectorId: { in: scope } };
   }
+  return where;
+}
+
+router.get("/", async (req, res) => {
   const fichadas = await prisma.timeRecord.findMany({
-    where,
+    where: buildWhere(req),
     include: { employee: true },
     orderBy: { fecha: "desc" },
     take: 500,
   });
   res.json(fichadas);
+});
+
+router.get("/export.xlsx", async (req, res) => {
+  const fichadas = await prisma.timeRecord.findMany({
+    where: buildWhere(req),
+    include: { employee: true },
+    orderBy: { fecha: "desc" },
+  });
+  const rows = [
+    ["Legajo", "Empleado", "Fecha", "Hora entrada", "Hora salida", "Origen"],
+    ...fichadas.map((f) => [
+      f.employee.legajo,
+      `${f.employee.apellido}, ${f.employee.nombre}`,
+      f.fecha.toLocaleDateString("es-AR", { timeZone: "UTC" }),
+      f.horaEntrada.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }),
+      f.horaSalida ? f.horaSalida.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }) : "",
+      f.origen,
+    ]),
+  ];
+  sendXlsx(res, "fichadas.xlsx", "Fichadas", rows);
 });
 
 const fichadaSchema = z.object({

@@ -3,8 +3,35 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { sectorScope } from "../middleware/auth.js";
 import { diasCorrespondientes, type TramoVacaciones } from "../engine/vacaciones.js";
+import { sendXlsx } from "../lib/xlsxExport.js";
 
 const router = Router();
+
+router.get("/export.xlsx", async (req, res) => {
+  const scope = sectorScope(req);
+  const { employeeId } = req.query as Record<string, string | undefined>;
+  const where: Record<string, unknown> = {};
+  if (employeeId) where.employeeId = employeeId;
+  if (scope) where.employee = { sectorId: { in: scope } };
+  const periodos = await prisma.vacationPeriod.findMany({
+    where,
+    include: { employee: true },
+    orderBy: { fechaDesde: "desc" },
+  });
+  const rows = [
+    ["Legajo", "Empleado", "Año", "Desde", "Hasta", "Días tomados", "Observaciones"],
+    ...periodos.map((p) => [
+      p.employee.legajo,
+      `${p.employee.apellido}, ${p.employee.nombre}`,
+      p.anioCorrespondiente,
+      p.fechaDesde.toLocaleDateString("es-AR", { timeZone: "UTC" }),
+      p.fechaHasta.toLocaleDateString("es-AR", { timeZone: "UTC" }),
+      p.diasTomados,
+      p.observaciones ?? "",
+    ]),
+  ];
+  sendXlsx(res, "vacaciones.xlsx", "Vacaciones", rows);
+});
 
 router.get("/:employeeId/balance", async (req, res) => {
   const anio = req.query.anio ? Number(req.query.anio) : new Date().getFullYear();

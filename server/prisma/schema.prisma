@@ -42,7 +42,6 @@ enum TipoAusencia {
 enum EstadoFranco {
   PENDIENTE
   TOMADO
-  PAGADO
 }
 
 enum TipoLiquidacion {
@@ -85,14 +84,15 @@ model Empresa {
 }
 
 model Sector {
-  id        String     @id @default(cuid())
-  nombre    String
-  activo    Boolean    @default(true)
-  createdAt DateTime   @default(now())
-  empresaId String?
-  empresa   Empresa?   @relation(fields: [empresaId], references: [id])
-  empleados Employee[]
-  encargados UserSector[]
+  id             String       @id @default(cuid())
+  nombre         String
+  activo         Boolean      @default(true)
+  trabajaSabados Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  empresaId      String?
+  empresa        Empresa?     @relation(fields: [empresaId], references: [id])
+  empleados      Employee[]
+  encargados     UserSector[]
 }
 
 model UserSector {
@@ -237,11 +237,9 @@ model FrancoCompensatorio {
   horas          Float        @default(8)
   estado         EstadoFranco @default(PENDIENTE)
   fechaTomado    DateTime?
-  liquidacionId  String?
   createdAt      DateTime     @default(now())
 
-  employee    Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  liquidacion PayrollPeriod? @relation(fields: [liquidacionId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 }
 
 model PayrollPeriod {
@@ -253,17 +251,14 @@ model PayrollPeriod {
   horasNormales  Float             @default(0)
   horasExtra50   Float             @default(0)
   horasExtra100  Float             @default(0)
-  cantidadFrancosPagados Int       @default(0)
   montoNormal    Float             @default(0)
   montoExtra50   Float             @default(0)
   montoExtra100  Float             @default(0)
-  montoFrancos   Float             @default(0)
   totalBruto     Float             @default(0)
   estado         EstadoLiquidacion @default(BORRADOR)
   generadoPorId  String
   createdAt      DateTime          @default(now())
 
-  employee    Employee              @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  generadoPor User                  @relation(fields: [generadoPorId], references: [id])
-  francos     FrancoCompensatorio[]
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  generadoPor User     @relation(fields: [generadoPorId], references: [id])
 }

@@ -33,3 +33,8 @@ export function dayOfWeekUtc(date: Date): number {
 export function localDateTime(fecha: Date, hours: number, minutes: number, seconds = 0): Date {
   return new Date(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate(), hours, minutes, seconds, 0);
 }
+
+/** Formatea un instante real (hora de pared local) como "HH:MM". */
+export function formatHHMM(instante: Date): string {
+  return `${String(instante.getHours()).padStart(2, "0")}:${String(instante.getMinutes()).padStart(2, "0")}`;
+}
