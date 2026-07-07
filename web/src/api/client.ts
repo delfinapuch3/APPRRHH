@@ -24,11 +24,14 @@ api.interceptors.response.use(
   }
 );
 
+const NO_SE_PUDO_CONECTAR = "No se pudo conectar con el servidor. Verificá que esté corriendo.";
+
 /** Extrae el mensaje más útil posible de un error de axios para mostrarlo en pantalla. */
 export function errorMessage(err: unknown, fallback: string): string {
   if (!err || typeof err !== "object") return fallback;
-  const anyErr = err as { response?: { data?: { error?: unknown } }; request?: unknown; message?: string };
-  const serverError = anyErr.response?.data?.error;
+  const anyErr = err as { response?: { status?: number; data?: unknown }; request?: unknown; message?: string };
+  const data = anyErr.response?.data;
+  const serverError = data && typeof data === "object" ? (data as { error?: unknown }).error : undefined;
   if (typeof serverError === "string" && serverError.trim()) return serverError;
   if (serverError && typeof serverError === "object") {
     // errores de validación de zod (flatten): mostrar el primer mensaje de campo si existe
@@ -36,6 +39,11 @@ export function errorMessage(err: unknown, fallback: string): string {
     const primero = flat.formErrors?.[0] ?? Object.values(flat.fieldErrors ?? {})[0]?.[0];
     if (primero) return primero;
   }
-  if (anyErr.request && !anyErr.response) return "No se pudo conectar con el servidor. Verificá que esté corriendo.";
+  if (anyErr.request && !anyErr.response) return NO_SE_PUDO_CONECTAR;
+  // Un 5xx sin el formato { error } esperado no vino de nuestra API: es el proxy de
+  // Vite (u otro intermediario) avisando que no pudo llegar al backend, no un error
+  // real de la operación. Mostrar eso tal cual en vez del fallback específico evita
+  // confundir "el servidor está apagado" con "el archivo está mal".
+  if ((anyErr.response?.status ?? 0) >= 500 && serverError === undefined) return NO_SE_PUDO_CONECTAR;
   return fallback;
 }
