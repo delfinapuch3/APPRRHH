@@ -10,8 +10,8 @@ const navItems: {
   adminOnly: boolean;
   icon: ComponentType<IconProps>;
 }[] = [
-  { to: "/dashboard", label: "Dashboard", adminOnly: false, icon: IconDash },
-  { to: "/empleados", label: "Empleados", adminOnly: false, icon: IconUsers },
+  { to: "/dashboard", label: "Panel de control", adminOnly: false, icon: IconDash },
+  { to: "/administracion", label: "Administración", adminOnly: false, icon: IconUsers },
   { to: "/fichadas", label: "Fichadas", adminOnly: false, icon: IconClock },
   { to: "/asistencia", label: "Asistencia", adminOnly: false, icon: IconCheck },
   { to: "/vacaciones", label: "Vacaciones", adminOnly: false, icon: IconSun },
@@ -58,32 +58,33 @@ export function Layout() {
         />
       )}
 
-      {/* Botón flotante para volver a abrir el panel cuando está escondido (desktop) */}
-      {colapsado && (
-        <button className="sidebar-toggle" onClick={() => setColapsado(false)} aria-label="Mostrar panel lateral">
-          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-      )}
-
       {/* Sidebar */}
       <aside className={`sidebar${open ? " open" : ""}${colapsado ? " colapsado" : ""}`}>
-        <div className="px-4 pt-5 pb-4 border-b border-sidebar-border text-center relative">
+        <div className="px-3 pt-5 pb-4 border-b border-sidebar-border text-center relative">
           <button
-            onClick={() => setColapsado(true)}
-            aria-label="Esconder panel lateral"
-            className="hidden md:flex items-center justify-center absolute top-3 right-3 w-6 h-6 rounded text-sidebar-text hover:bg-sidebar-hover hover:text-white transition"
+            onClick={() => setColapsado((v) => !v)}
+            aria-label={colapsado ? "Mostrar panel lateral" : "Esconder panel lateral"}
+            className={`hidden md:flex items-center justify-center absolute top-3 w-6 h-6 rounded text-sidebar-text hover:bg-sidebar-hover hover:text-white transition ${colapsado ? "right-1/2 translate-x-1/2" : "right-3"}`}
             style={{ background: "none", border: "none", cursor: "pointer" }}
           >
-            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+              style={{ transform: colapsado ? "rotate(180deg)" : "none" }}
+            >
               <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          <Logo width={140} />
-          <div className="mt-1.5 text-[10px] text-center uppercase tracking-[.06em] text-sidebar-text/70">
-            Gestión de Operarios
-          </div>
+          {colapsado ? <LogoMark /> : <Logo width={140} />}
+          {!colapsado && (
+            <div className="mt-1.5 text-[10px] text-center uppercase tracking-[.06em] text-sidebar-text/70">
+              Gestión de Operarios
+            </div>
+          )}
         </div>
 
         <nav className="flex-1 py-3 px-2.5 overflow-y-auto">
@@ -94,12 +95,13 @@ export function Layout() {
                 key={item.to}
                 to={item.to}
                 onClick={() => setOpen(false)}
+                title={colapsado ? item.label : undefined}
                 className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}
               >
                 {({ isActive }) => (
                   <>
                     <Icon active={isActive} />
-                    {item.label}
+                    {!colapsado && item.label}
                   </>
                 )}
               </NavLink>
@@ -107,21 +109,24 @@ export function Layout() {
           })}
         </nav>
         <div className="px-3 py-3 border-t border-sidebar-border">
-          <div className="px-2 mb-2">
-            <div className="text-sm font-medium text-slate-200 truncate">{user?.nombre}</div>
-            <div className="text-xs text-sidebar-text">
-              {user?.role === "ADMIN" ? "Administrador" : "Encargado de sector"}
+          {!colapsado && (
+            <div className="px-2 mb-2">
+              <div className="text-sm font-medium text-slate-200 truncate">{user?.nombre}</div>
+              <div className="text-xs text-sidebar-text">
+                {user?.role === "ADMIN" ? "Administrador" : "Encargado de sector"}
+              </div>
             </div>
-          </div>
+          )}
           <button
             onClick={logout}
-            className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm text-sidebar-text hover:bg-sidebar-hover hover:text-slate-200 transition"
+            title={colapsado ? "Cerrar sesión" : undefined}
+            className={`flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm text-sidebar-text hover:bg-sidebar-hover hover:text-slate-200 transition ${colapsado ? "justify-center" : ""}`}
             style={{ background: "none", border: "none", cursor: "pointer" }}
           >
             <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
               <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            Cerrar sesión
+            {!colapsado && "Cerrar sesión"}
           </button>
         </div>
       </aside>
@@ -137,6 +142,14 @@ export function Layout() {
 
 function Logo({ width = 150 }: { width?: number }) {
   return <img src="/logo.png" alt="POLYSAN S.A. / POLCECAL S.A." width={width} style={{ objectFit: "contain" }} />;
+}
+
+function LogoMark() {
+  return (
+    <div className="w-8 h-8 mx-auto rounded-lg bg-white/95 flex items-center justify-center overflow-hidden">
+      <img src="/logo.png" alt="POLYSAN S.A. / POLCECAL S.A." style={{ width: 24, height: 24, objectFit: "contain" }} />
+    </div>
+  );
 }
 
 /* ─── Nav Icons ─── */

@@ -65,6 +65,7 @@ model User {
   email        String     @unique
   passwordHash String
   nombre       String
+  apellido     String     @default("")
   role         Role       @default(ENCARGADO)
   activo       Boolean    @default(true)
   createdAt    DateTime   @default(now())
@@ -114,17 +115,40 @@ model Employee {
   valorHoraNormal          Float
   horasTeoricasDiarias     Float    @default(8)
   sectorId                 String?
+  jornadaId                String?
   activo                   Boolean  @default(true)
   escalaVacacionesOverride String?
   createdAt                DateTime @default(now())
 
   sector            Sector?             @relation(fields: [sectorId], references: [id])
+  jornada           Jornada?            @relation(fields: [jornadaId], references: [id])
   fichadas          TimeRecord[]
   calculosDiarios   DailyCalculation[]
   ausencias         Absence[]
   vacaciones        VacationPeriod[]
   francos           FrancoCompensatorio[]
   liquidaciones     PayrollPeriod[]
+}
+
+/**
+ * Jornada: plantilla de horario (oficina 8 a 16, turnos rotativos 4-12/12-20/
+ * 20-4, etc.) que se le asigna a un operario. redondeoMinutos redondea el
+ * total de horas trabajadas del día al incremento más cercano (ej. 60 =
+ * redondear a la hora más cercana, así 7.9hs queda en 8hs). toleranciaMinutos
+ * es la ventana de gracia sobre horaInicio antes de marcar el día como
+ * tardanza.
+ */
+model Jornada {
+  id                String   @id @default(cuid())
+  nombre            String
+  horaInicio        String
+  horaFin           String
+  redondeoMinutos   Int      @default(0)
+  toleranciaMinutos Int      @default(0)
+  activo            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  empleados Employee[]
 }
 
 model TimeRecord {
@@ -192,6 +216,7 @@ model DailyCalculation {
   validadoPorId   String?
   fechaValidacion DateTime?
   horasManual     Boolean       @default(false)
+  tarde           Boolean       @default(false)
   updatedAt       DateTime      @updatedAt
 
   employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)

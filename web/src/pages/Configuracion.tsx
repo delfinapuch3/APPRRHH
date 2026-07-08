@@ -27,10 +27,6 @@ export default function Configuracion() {
     queryFn: async () =>
       (await api.get("/sectores")).data as { id: string; nombre: string; empresa: { nombre: string } | null }[],
   });
-  const { data: feriados } = useQuery({
-    queryKey: ["feriados"],
-    queryFn: async () => (await api.get("/configuracion/feriados")).data as { id: string; fecha: string; nombre: string }[],
-  });
 
   const [local, setLocal] = useState<Config | null>(null);
   useEffect(() => {
@@ -58,19 +54,6 @@ export default function Configuracion() {
       queryClient.invalidateQueries({ queryKey: ["sectores"] });
       setNuevoSector({ nombre: "", empresaId: "" });
     },
-  });
-
-  const [nuevoFeriado, setNuevoFeriado] = useState({ fecha: "", nombre: "" });
-  const crearFeriado = useMutation({
-    mutationFn: async () => api.post("/configuracion/feriados", nuevoFeriado),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["feriados"] });
-      setNuevoFeriado({ fecha: "", nombre: "" });
-    },
-  });
-  const borrarFeriado = useMutation({
-    mutationFn: async (id: string) => api.delete(`/configuracion/feriados/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["feriados"] }),
   });
 
   if (!local) return <p className="text-slate-500">Cargando...</p>;
@@ -177,7 +160,7 @@ export default function Configuracion() {
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-2 gap-6 mb-6">
         <div className="card p-5">
           <h2 className="font-medium text-slate-700 mb-3">Empresas</h2>
           <ul className="text-sm mb-3 space-y-1">
@@ -241,47 +224,6 @@ export default function Configuracion() {
               ))}
             </select>
             <button type="submit" className="bg-primary text-white text-sm px-3 py-1.5 rounded-md w-full">
-              Agregar
-            </button>
-          </form>
-        </div>
-
-        <div className="card p-5">
-          <h2 className="font-medium text-slate-700 mb-3">Feriados</h2>
-          <ul className="text-sm mb-3 space-y-1 max-h-40 overflow-auto">
-            {feriados?.map((f) => (
-              <li key={f.id} className="flex justify-between items-center text-slate-600">
-                <span>
-                  {new Date(f.fecha).toLocaleDateString("es-AR", { timeZone: "UTC" })} - {f.nombre}
-                </span>
-                <button onClick={() => borrarFeriado.mutate(f.id)} className="text-red-500 text-xs">
-                  eliminar
-                </button>
-              </li>
-            ))}
-          </ul>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              crearFeriado.mutate();
-            }}
-            className="flex gap-2"
-          >
-            <input
-              type="date"
-              required
-              value={nuevoFeriado.fecha}
-              onChange={(e) => setNuevoFeriado({ ...nuevoFeriado, fecha: e.target.value })}
-              className="border border-slate-300 rounded-md px-2 py-1.5 text-sm"
-            />
-            <input
-              required
-              placeholder="Nombre"
-              value={nuevoFeriado.nombre}
-              onChange={(e) => setNuevoFeriado({ ...nuevoFeriado, nombre: e.target.value })}
-              className="flex-1 border border-slate-300 rounded-md px-2 py-1.5 text-sm"
-            />
-            <button type="submit" className="bg-primary text-white text-sm px-3 py-1.5 rounded-md">
               Agregar
             </button>
           </form>

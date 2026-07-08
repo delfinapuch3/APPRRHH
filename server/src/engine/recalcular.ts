@@ -71,7 +71,13 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
   // Se trae un día extra hacia atrás para poder partir correctamente los
   // turnos que arrancaron el día anterior al rango pedido y cruzan medianoche.
   const [empleado, fichadas, ausencias, vacaciones, feriados] = await Promise.all([
-    prisma.employee.findUnique({ where: { id: employeeId }, select: { sector: { select: { nombre: true } } } }),
+    prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: {
+        sector: { select: { nombre: true } },
+        jornada: { select: { horaInicio: true, redondeoMinutos: true, toleranciaMinutos: true } },
+      },
+    }),
     prisma.timeRecord.findMany({
       where: { employeeId, fecha: { gte: addUtcDays(startOfDay(desde), -1), lte: startOfDay(hasta) } },
     }),
@@ -86,6 +92,7 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
     }),
   ]);
   const trabajaLunesAViernesNomas = empleado?.sector?.nombre === SECTOR_LUNES_A_VIERNES;
+  const jornada = empleado?.jornada ?? null;
 
   const feriadosSet = new Set(feriados.map((f) => startOfDay(f.fecha).getTime()));
 
@@ -106,6 +113,7 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
     justificada: boolean | null;
     tipoAusencia: string | null;
     observaciones: string | null;
+    tarde: boolean;
   }[] = [];
 
   for (const dia of dias) {
@@ -113,7 +121,7 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
     const intervals = intervalsParaDia(dia, fichadas);
 
     const esFeriado = feriadosSet.has(key);
-    const calc = calcularDia(dia, intervals, esFeriado, config);
+    const calc = calcularDia(dia, intervals, esFeriado, config, jornada?.redondeoMinutos ?? 0);
 
     const dow = dayOfWeekUtc(dia);
     const esDomingoLibre = dow === 0; // domingo es franco semanal, no cuenta como ausencia si no trabajó
@@ -121,8 +129,23 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
 
     // Hay fichada ese día si arrancó (o siguió) alguna marcación en este día calendario,
     // esté o no completa: una marcación sin salida (abierta) igual demuestra que vino a trabajar.
-    const tieneFichada = fichadas.some((f) => startOfDay(f.fecha).getTime() === key);
-    const tieneFichadaAbierta = fichadas.some((f) => startOfDay(f.fecha).getTime() === key && !f.horaSalida);
+    const fichadasDelDia = fichadas.filter((f) => startOfDay(f.fecha).getTime() === key);
+    const tieneFichada = fichadasDelDia.length > 0;
+    const tieneFichadaAbierta = fichadasDelDia.some((f) => !f.horaSalida);
+
+    // Tardanza: la jornada asignada define la hora de entrada esperada; si la
+    // primera marcación del día llega después de esa hora + el margen de
+    // tolerancia, se marca el día como tarde.
+    let tarde = false;
+    if (jornada && tieneFichada && !esDomingoLibre && !esSabadoNoLaboral) {
+      const primeraEntrada = fichadasDelDia.reduce(
+        (min, f) => (f.horaEntrada < min ? f.horaEntrada : min),
+        fichadasDelDia[0].horaEntrada
+      );
+      const [h, m] = jornada.horaInicio.split(":").map(Number);
+      const limite = new Date(localDateTime(dia, h, m).getTime() + jornada.toleranciaMinutos * 60_000);
+      tarde = primeraEntrada > limite;
+    }
 
     const vacacion = vacaciones.find((v) => startOfDay(v.fechaDesde) <= dia && startOfDay(v.fechaHasta) >= dia);
     const ausenciaCargada = ausencias.find(
@@ -161,6 +184,7 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
       justificada,
       tipoAusencia,
       observaciones,
+      tarde,
     });
   }
 
@@ -190,6 +214,7 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
           justificada: r.justificada,
           tipoAusencia: r.tipoAusencia as never,
           observaciones: r.observaciones,
+          tarde: r.tarde,
           ...resetValidacion,
         },
         create: {
@@ -199,6 +224,7 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
           horasNormales: r.horasNormales,
           horasExtra50: r.horasExtra50,
           horasExtra100: r.horasExtra100,
+          tarde: r.tarde,
           francoGenerado: r.francoGenerado,
           ausente: r.ausente,
           justificada: r.justificada,

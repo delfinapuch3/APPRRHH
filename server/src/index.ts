@@ -16,6 +16,7 @@ import configuracionRouter from "./routes/configuracion.js";
 import asistenciaRouter from "./routes/asistencia.js";
 import dashboardRouter from "./routes/dashboard.js";
 import usuariosRouter from "./routes/usuarios.js";
+import jornadasRouter from "./routes/jornadas.js";
 import { requireAuth } from "./middleware/auth.js";
 
 const app = express();
@@ -39,6 +40,7 @@ app.use("/api/configuracion", requireAuth, configuracionRouter);
 app.use("/api/asistencia", requireAuth, asistenciaRouter);
 app.use("/api/dashboard", requireAuth, dashboardRouter);
 app.use("/api/usuarios", requireAuth, usuariosRouter);
+app.use("/api/jornadas", requireAuth, jornadasRouter);
 
 const port = process.env.PORT ? Number(process.env.PORT) : 4000;
 app.listen(port, () => {

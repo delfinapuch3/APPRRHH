@@ -53,10 +53,11 @@ router.get("/resumen-hoy", async (req, res) => {
     }
   }
 
-  const [calculos, tardanzasHoy, vacacionesHoy] = await Promise.all([
+  const [calculos, tardanzasManuales, vacacionesHoy] = await Promise.all([
     prisma.dailyCalculation.findMany({ where: { employeeId: { in: empleadoIds }, fecha: hoy } }),
-    prisma.absence.count({
+    prisma.absence.findMany({
       where: { employeeId: { in: empleadoIds }, tipo: "TARDANZA", fechaDesde: { lte: hoy }, fechaHasta: { gte: hoy } },
+      select: { employeeId: true },
     }),
     prisma.vacationPeriod.count({
       where: { employeeId: { in: empleadoIds }, fechaDesde: { lte: hoy }, fechaHasta: { gte: hoy } },
@@ -66,6 +67,12 @@ router.get("/resumen-hoy", async (req, res) => {
   const totalActivos = empleados.length;
   const ausentesHoy = calculos.filter((c) => c.ausente).length;
   const presentesHoy = totalActivos - ausentesHoy;
+  // Combina la tardanza detectada automáticamente por jornada (DailyCalculation.tarde)
+  // con las cargadas a mano (Absence tipo TARDANZA), sin contar dos veces al mismo empleado.
+  const tardesIds = new Set<string>([
+    ...calculos.filter((c) => c.tarde).map((c) => c.employeeId),
+    ...tardanzasManuales.map((a) => a.employeeId),
+  ]);
 
   const pct = (n: number) => (totalActivos > 0 ? Math.round((n / totalActivos) * 1000) / 10 : 0);
 
@@ -73,7 +80,7 @@ router.get("/resumen-hoy", async (req, res) => {
     totalActivos,
     presentes: { cantidad: presentesHoy, porcentaje: pct(presentesHoy) },
     ausentes: { cantidad: ausentesHoy, porcentaje: pct(ausentesHoy) },
-    tardes: { cantidad: tardanzasHoy, porcentaje: pct(tardanzasHoy) },
+    tardes: { cantidad: tardesIds.size, porcentaje: pct(tardesIds.size) },
     vacaciones: { cantidad: vacacionesHoy, porcentaje: pct(vacacionesHoy) },
   });
 });

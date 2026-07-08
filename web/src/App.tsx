@@ -3,7 +3,7 @@ import Login from "./pages/Login.js";
 import { Layout } from "./components/Layout.js";
 import { ProtectedRoute, AdminRoute } from "./components/ProtectedRoute.js";
 import Dashboard from "./pages/Dashboard.js";
-import Empleados from "./pages/Empleados.js";
+import Administracion from "./pages/Administracion.js";
 import EmpleadoDetalle from "./pages/EmpleadoDetalle.js";
 import Fichadas from "./pages/Fichadas.js";
 import Asistencia from "./pages/Asistencia.js";
@@ -20,7 +20,7 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/empleados" element={<Empleados />} />
+          <Route path="/administracion" element={<Administracion />} />
           <Route path="/empleados/:id" element={<EmpleadoDetalle />} />
           <Route path="/fichadas" element={<Fichadas />} />
           <Route path="/asistencia" element={<Asistencia />} />

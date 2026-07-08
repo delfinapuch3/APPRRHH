@@ -18,12 +18,20 @@ interface Empleado {
   horasTeoricasDiarias: number;
   activo: boolean;
   sectorId: string | null;
+  jornadaId: string | null;
   sector: { nombre: string; empresa: { nombre: string } | null } | null;
 }
 
 interface Sector {
   id: string;
   nombre: string;
+}
+
+interface Jornada {
+  id: string;
+  nombre: string;
+  horaInicio: string;
+  horaFin: string;
 }
 
 interface Fichada {
@@ -78,6 +86,11 @@ export default function EmpleadoDetalle() {
     queryFn: async () => (await api.get("/sectores")).data as Sector[],
     enabled: isAdmin,
   });
+  const { data: jornadas } = useQuery({
+    queryKey: ["jornadas"],
+    queryFn: async () => (await api.get("/jornadas")).data as Jornada[],
+    enabled: isAdmin,
+  });
 
   const { data: dias, isLoading: cargandoDias } = useQuery({
     queryKey: ["asistencia-empleado", id, desde, hasta],
@@ -116,6 +129,7 @@ export default function EmpleadoDetalle() {
     valorHoraNormal: "",
     horasTeoricasDiarias: "",
     sectorId: "",
+    jornadaId: "",
   });
   useEffect(() => {
     if (empleado) {
@@ -127,6 +141,7 @@ export default function EmpleadoDetalle() {
         valorHoraNormal: String(empleado.valorHoraNormal),
         horasTeoricasDiarias: String(empleado.horasTeoricasDiarias),
         sectorId: empleado.sectorId ?? "",
+        jornadaId: empleado.jornadaId ?? "",
       });
     }
   }, [empleado]);
@@ -139,6 +154,7 @@ export default function EmpleadoDetalle() {
         valorHoraNormal: Number(form.valorHoraNormal),
         horasTeoricasDiarias: Number(form.horasTeoricasDiarias),
         sectorId: form.sectorId || null,
+        jornadaId: form.jornadaId || null,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["empleado", id] });
@@ -312,6 +328,21 @@ export default function EmpleadoDetalle() {
               {sectores?.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm text-slate-600 mb-1">Jornada</label>
+            <select
+              value={form.jornadaId}
+              onChange={(e) => setForm({ ...form, jornadaId: e.target.value })}
+              className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
+            >
+              <option value="">Sin asignar</option>
+              {jornadas?.map((j) => (
+                <option key={j.id} value={j.id}>
+                  {j.nombre} ({j.horaInicio}-{j.horaFin})
                 </option>
               ))}
             </select>

@@ -282,37 +282,23 @@
     position: fixed;
     top: 0; left: 0; bottom: 0;
     z-index: 40;
-    transition: transform .25s ease;
+    transition: width .2s ease;
+    overflow: hidden;
   }
-  .sidebar.colapsado { transform: translateX(-100%); }
+  /* Colapsado = riel de íconos, no se esconde del todo: queda el logo chico
+     y los íconos de navegación siempre accesibles con un click. */
+  .sidebar.colapsado { width: 68px; }
+  .sidebar.colapsado .nav-link { justify-content: center; padding-left: 0; padding-right: 0; }
   .main-content {
     flex: 1;
     min-width: 0;
     margin-left: 240px;
     min-height: 100vh;
     background: var(--bg);
-    transition: margin-left .25s ease;
+    transition: margin-left .2s ease;
   }
-  .main-content.colapsado { margin-left: 0; }
+  .main-content.colapsado { margin-left: 68px; }
 
-  .sidebar-toggle {
-    position: fixed;
-    top: 14px;
-    left: 14px;
-    z-index: 41;
-    width: 34px;
-    height: 34px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--sidebar-bg);
-    border: 1px solid var(--sidebar-border);
-    border-radius: 8px;
-    color: var(--sidebar-text);
-    cursor: pointer;
-    transition: background .15s, color .15s;
-  }
-  .sidebar-toggle:hover { background: var(--sidebar-hover); color: #fff; }
   .mobile-topbar {
     display: none;
     position: fixed;
@@ -358,7 +344,6 @@
   .sidebar.open { transform: translateX(0); }
   .main-content { margin-left: 0; padding-top: 56px; }
   .mobile-topbar { display: flex !important; }
-  .sidebar-toggle { display: none; }
 }
 
 /* ─── Animations ─── */
