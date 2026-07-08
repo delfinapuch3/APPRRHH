@@ -279,13 +279,35 @@
     z-index: 40;
     transition: transform .25s ease;
   }
+  .sidebar.colapsado { transform: translateX(-100%); }
   .main-content {
     flex: 1;
     min-width: 0;
     margin-left: 240px;
     min-height: 100vh;
     background: var(--bg);
+    transition: margin-left .25s ease;
   }
+  .main-content.colapsado { margin-left: 0; }
+
+  .sidebar-toggle {
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 41;
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--sidebar-bg);
+    border: 1px solid var(--sidebar-border);
+    border-radius: 8px;
+    color: var(--sidebar-text);
+    cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+  .sidebar-toggle:hover { background: var(--sidebar-hover); color: #fff; }
   .mobile-topbar {
     display: none;
     position: fixed;
@@ -331,12 +353,20 @@
   .sidebar.open { transform: translateX(0); }
   .main-content { margin-left: 0; padding-top: 56px; }
   .mobile-topbar { display: flex !important; }
+  .sidebar-toggle { display: none; }
 }
 
 /* ─── Animations ─── */
+/* Sin transform a propósito (ni en from ni en to): con animation-fill-mode
+   "both", cualquier transform que toque esta animación (incluso solo en el
+   "from", si por lo que sea la animación nunca llega a correr) queda fijo
+   en este wrapper que envuelve todas las páginas, y convierte cualquier
+   position:fixed hijo (los modales) en relativo al alto total de la página
+   en vez de a la ventana visible. Con solo opacity el wrapper nunca genera
+   containing block y los modales quedan siempre centrados en pantalla. */
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 .fade-up { animation: fadeUp .3s ease both; }
 .fade-up-1 { animation-delay: .05s; }

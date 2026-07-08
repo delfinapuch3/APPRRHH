@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext.js";
 
@@ -20,9 +20,16 @@ const navItems: {
   { to: "/configuracion", label: "Configuración", adminOnly: true, icon: IconCog },
 ];
 
+const SIDEBAR_COLAPSADO_KEY = "sidebarColapsado";
+
 export function Layout() {
   const { user, logout, isAdmin } = useAuth();
   const [open, setOpen] = useState(false);
+  const [colapsado, setColapsado] = useState(() => localStorage.getItem(SIDEBAR_COLAPSADO_KEY) === "1");
+
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_COLAPSADO_KEY, colapsado ? "1" : "0");
+  }, [colapsado]);
 
   const items = navItems.filter((i) => !i.adminOnly || isAdmin);
 
@@ -51,9 +58,28 @@ export function Layout() {
         />
       )}
 
+      {/* Botón flotante para volver a abrir el panel cuando está escondido (desktop) */}
+      {colapsado && (
+        <button className="sidebar-toggle" onClick={() => setColapsado(false)} aria-label="Mostrar panel lateral">
+          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      )}
+
       {/* Sidebar */}
-      <aside className={`sidebar${open ? " open" : ""}`}>
-        <div className="px-4 pt-5 pb-4 border-b border-sidebar-border text-center">
+      <aside className={`sidebar${open ? " open" : ""}${colapsado ? " colapsado" : ""}`}>
+        <div className="px-4 pt-5 pb-4 border-b border-sidebar-border text-center relative">
+          <button
+            onClick={() => setColapsado(true)}
+            aria-label="Esconder panel lateral"
+            className="hidden md:flex items-center justify-center absolute top-3 right-3 w-6 h-6 rounded text-sidebar-text hover:bg-sidebar-hover hover:text-white transition"
+            style={{ background: "none", border: "none", cursor: "pointer" }}
+          >
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
           <Logo width={140} />
           <div className="mt-1.5 text-[10px] text-center uppercase tracking-[.06em] text-sidebar-text/70">
             Gestión de Operarios
@@ -100,7 +126,7 @@ export function Layout() {
         </div>
       </aside>
 
-      <main className="main-content">
+      <main className={`main-content${colapsado ? " colapsado" : ""}`}>
         <div className="p-6 md:p-8 fade-up">
           <Outlet />
         </div>
