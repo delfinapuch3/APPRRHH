@@ -1,13 +1,9 @@
-import { randomUUID } from "node:crypto";
 import { Router } from "express";
-import multer from "multer";
-import { z } from "zod";
 import { prisma } from "../db.js";
-import { requireAdmin, sectorScope } from "../middleware/auth.js";
+import { sectorScope } from "../middleware/auth.js";
 import { recalcularSectorPeriodo } from "../engine/recalcular.js";
 import { utcDateOnlyFrom } from "../lib/dates.js";
 import { SECTOR_LUNES_A_VIERNES } from "../lib/constants.js";
-import { parseWorkbookAllSheets, pickBestSheet, toDateOnlyFromCell, type ParsedSheet } from "../lib/excelImport.js";
 
 const router = Router();
 
@@ -178,101 +174,6 @@ router.get("/por-empresa", async (req, res) => {
     conteo.set(clave, (conteo.get(clave) ?? 0) + 1);
   }
   res.json([...conteo.entries()].map(([empresa, cantidad]) => ({ empresa, cantidad })));
-});
-
-// --- Importación de datos demográficos (fecha de nacimiento / género), por legajo ---
-
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
-const KEYWORDS = ["legajo", "nacimiento", "genero", "sexo"];
-
-interface CachedImport {
-  sheetNames: string[];
-  sheets: Record<string, ParsedSheet>;
-  expiresAt: number;
-}
-const cache = new Map<string, CachedImport>();
-function cleanupCache() {
-  const now = Date.now();
-  for (const [token, entry] of cache) if (entry.expiresAt < now) cache.delete(token);
-}
-function sheetSummary(sheetNames: string[], sheet: string, parsed: ParsedSheet) {
-  return { sheetNames, sheet, headers: parsed.headers, sample: parsed.rows.slice(0, 15), totalRows: parsed.rows.length };
-}
-
-router.post("/import-demografia/preview", requireAdmin, upload.single("file"), (req, res) => {
-  cleanupCache();
-  if (!req.file) return res.status(400).json({ error: "Falta el archivo" });
-  try {
-    const { sheetNames, sheets } = parseWorkbookAllSheets(req.file.buffer);
-    const nonEmpty = sheetNames.filter((n) => sheets[n].rows.length > 0);
-    if (nonEmpty.length === 0) return res.status(400).json({ error: "El archivo no tiene filas en ninguna hoja" });
-    const sheet = pickBestSheet(nonEmpty, sheets, KEYWORDS);
-    const token = randomUUID();
-    cache.set(token, { sheetNames, sheets, expiresAt: Date.now() + 15 * 60 * 1000 });
-    res.json({ token, ...sheetSummary(sheetNames, sheet, sheets[sheet]) });
-  } catch {
-    res.status(400).json({ error: "No se pudo leer el archivo. Verificá que sea .xlsx o .csv" });
-  }
-});
-
-router.post("/import-demografia/preview-sheet", requireAdmin, (req, res) => {
-  const { token, sheet } = req.body as { token?: string; sheet?: string };
-  if (!token || !sheet) return res.status(400).json({ error: "Falta token o nombre de hoja" });
-  const entry = cache.get(token);
-  if (!entry) return res.status(400).json({ error: "La vista previa expiró, volvé a subir el archivo" });
-  const parsed = entry.sheets[sheet];
-  if (!parsed) return res.status(400).json({ error: "Esa hoja no existe en el archivo" });
-  res.json(sheetSummary(entry.sheetNames, sheet, parsed));
-});
-
-const confirmDemografiaSchema = z.object({
-  token: z.string(),
-  sheet: z.string(),
-  mapping: z.object({
-    legajo: z.string().min(1),
-    fechaNacimiento: z.string().optional(),
-    genero: z.string().optional(),
-  }),
-});
-
-router.post("/import-demografia/confirm", requireAdmin, async (req, res) => {
-  const parsed = confirmDemografiaSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const { token, sheet, mapping } = parsed.data;
-  const entry = cache.get(token);
-  if (!entry) return res.status(400).json({ error: "La vista previa expiró, volvé a subir el archivo" });
-  const hoja = entry.sheets[sheet];
-  if (!hoja) return res.status(400).json({ error: "Esa hoja no existe en el archivo" });
-
-  const errores: string[] = [];
-  let actualizados = 0;
-
-  for (let idx = 0; idx < hoja.rows.length; idx++) {
-    const row = hoja.rows[idx];
-    const legajo = String(row[mapping.legajo] ?? "").trim();
-    if (!legajo) continue; // fila vacía
-
-    const data: { fechaNacimiento?: Date; genero?: string } = {};
-    if (mapping.fechaNacimiento) {
-      const fecha = toDateOnlyFromCell(row[mapping.fechaNacimiento]);
-      if (fecha) data.fechaNacimiento = fecha;
-    }
-    if (mapping.genero) {
-      const genero = String(row[mapping.genero] ?? "").trim();
-      if (genero) data.genero = genero;
-    }
-    if (Object.keys(data).length === 0) continue;
-
-    try {
-      await prisma.employee.update({ where: { legajo }, data });
-      actualizados += 1;
-    } catch {
-      errores.push(`Fila ${idx + 2}: legajo "${legajo}" no encontrado, se omitió`);
-    }
-  }
-
-  cache.delete(token);
-  res.json({ actualizados, errores });
 });
 
 export default router;

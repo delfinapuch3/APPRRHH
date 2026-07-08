@@ -343,7 +343,8 @@
   .nav-link-sub {
     display: flex;
     align-items: center;
-    padding: 7px 12px 7px 34px;
+    gap: 8px;
+    padding: 7px 12px 7px 22px;
     border-radius: 8px;
     margin-bottom: 2px;
     font-family: 'Public Sans', sans-serif;

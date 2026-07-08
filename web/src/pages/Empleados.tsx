@@ -47,6 +47,8 @@ const MAPPING_FIELDS = [
   ["fechaIngreso", "Fecha de ingreso"],
   ["sector", "Sector (opcional)"],
   ["horasTeoricasDiarias", "Horas teóricas diarias (opcional)"],
+  ["fechaNacimiento", "Fecha de nacimiento (opcional)"],
+  ["genero", "Género (opcional)"],
 ] as const;
 
 export default function Empleados() {
@@ -131,6 +133,8 @@ export default function Empleados() {
     fechaIngreso: "",
     sector: "",
     horasTeoricasDiarias: "",
+    fechaNacimiento: "",
+    genero: "",
   });
   const [importResult, setImportResult] = useState<{ creados: number; actualizados: number; errores: string[] } | null>(null);
 
@@ -145,6 +149,8 @@ export default function Empleados() {
       fechaIngreso: guess("ingreso"),
       sector: guess("sector"),
       horasTeoricasDiarias: guess("teoric"),
+      fechaNacimiento: guess("nacimiento"),
+      genero: guess("genero") || guess("género") || guess("sexo"),
     };
   }
 
@@ -243,9 +249,9 @@ export default function Empleados() {
         <div className="card p-5 mb-6">
           <h2 className="font-medium text-slate-700 mb-1">Importar planilla de empleados</h2>
           <p className="text-sm text-slate-500 mb-3">
-            Subí un Excel/CSV con una fila por empleado. Columnas necesarias: Legajo, Nombre, Apellido y Valor hora
-            normal. Sindicato, Sector y horas teóricas diarias son opcionales. Si el legajo ya existe, se actualizan
-            sus datos.
+            Subí un Excel/CSV con una fila por empleado (ej. la nómina completa de RRHH). Columnas necesarias:
+            Legajo, Nombre, Apellido y Valor hora normal. Sindicato, Sector, horas teóricas diarias, fecha de
+            nacimiento y género son opcionales. Si el legajo ya existe, se actualizan sus datos.
           </p>
           <input
             type="file"

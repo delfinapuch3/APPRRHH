@@ -10,30 +10,14 @@ interface Empleado {
   apellido: string;
 }
 
-interface PeriodoHistorial {
-  id: string;
-  anioCorrespondiente: number;
-  fechaDesde: string;
-  fechaHasta: string;
-  diasTomados: number;
-  employee: { legajo: string; nombre: string; apellido: string };
-}
-
 export default function Vacaciones() {
   const queryClient = useQueryClient();
-  const [vista, setVista] = useState<"empleado" | "historial">("empleado");
   const { data: empleados } = useQuery({
     queryKey: ["empleados"],
     queryFn: async () => (await api.get("/empleados")).data as Empleado[],
   });
   const [employeeId, setEmployeeId] = useState("");
   const [anio, setAnio] = useState(new Date().getFullYear());
-
-  const { data: historial, isLoading: cargandoHistorial } = useQuery({
-    queryKey: ["vacaciones-historial"],
-    queryFn: async () => (await api.get("/vacaciones")).data as PeriodoHistorial[],
-    enabled: vista === "historial",
-  });
 
   const { data: balance } = useQuery({
     queryKey: ["vacaciones-balance", employeeId, anio],
@@ -61,66 +45,6 @@ export default function Vacaciones() {
     <div>
       <h1 className="page-header mb-6">Vacaciones</h1>
 
-      <div className="flex gap-2 mb-6">
-        <button
-          onClick={() => setVista("empleado")}
-          className={`px-4 py-2 rounded-md text-sm ${vista === "empleado" ? "bg-primary text-white" : "bg-white text-slate-600"}`}
-        >
-          Por empleado
-        </button>
-        <button
-          onClick={() => setVista("historial")}
-          className={`px-4 py-2 rounded-md text-sm ${vista === "historial" ? "bg-primary text-white" : "bg-white text-slate-600"}`}
-        >
-          Historial
-        </button>
-      </div>
-
-      {vista === "historial" && (
-        <div className="card p-5">
-          <h2 className="font-medium text-slate-700 mb-3">Historial de vacaciones (todo el personal)</h2>
-          {cargandoHistorial ? (
-            <p className="text-slate-500 text-sm">Cargando...</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-500 border-b">
-                  <th className="pb-2">Legajo</th>
-                  <th className="pb-2">Empleado</th>
-                  <th className="pb-2">Año</th>
-                  <th className="pb-2">Desde</th>
-                  <th className="pb-2">Hasta</th>
-                  <th className="pb-2">Días</th>
-                </tr>
-              </thead>
-              <tbody>
-                {historial?.map((p) => (
-                  <tr key={p.id} className="border-b last:border-0">
-                    <td className="py-2">{p.employee.legajo}</td>
-                    <td className="py-2">
-                      {p.employee.apellido}, {p.employee.nombre}
-                    </td>
-                    <td className="py-2">{p.anioCorrespondiente}</td>
-                    <td className="py-2">{new Date(p.fechaDesde).toLocaleDateString("es-AR", { timeZone: "UTC" })}</td>
-                    <td className="py-2">{new Date(p.fechaHasta).toLocaleDateString("es-AR", { timeZone: "UTC" })}</td>
-                    <td className="py-2">{p.diasTomados}</td>
-                  </tr>
-                ))}
-                {historial?.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="py-4 text-center text-slate-400">
-                      Todavía no hay períodos de vacaciones cargados
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-
-      {vista === "empleado" && (
-        <>
       <div className="flex gap-4 items-end mb-6 card p-4">
         <div>
           <label className="block text-xs text-slate-500 mb-1">Empleado</label>
@@ -243,8 +167,6 @@ export default function Vacaciones() {
               </tbody>
             </table>
           </div>
-        </>
-      )}
         </>
       )}
     </div>

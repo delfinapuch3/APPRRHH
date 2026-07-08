@@ -75,6 +75,8 @@ const confirmSchema = z.object({
     sindicato: z.string().optional(),
     sector: z.string().optional(),
     horasTeoricasDiarias: z.string().optional(),
+    fechaNacimiento: z.string().optional(),
+    genero: z.string().optional(),
   }),
 });
 
@@ -139,6 +141,9 @@ router.post("/confirm", async (req, res) => {
       if (parsedHoras !== null && parsedHoras > 0) horasTeoricasDiarias = parsedHoras;
     }
 
+    const fechaNacimiento = mapping.fechaNacimiento ? toDateOnlyFromCell(row[mapping.fechaNacimiento]) : null;
+    const genero = mapping.genero ? String(row[mapping.genero] ?? "").trim() || null : null;
+
     const data = {
       nombre,
       apellido,
@@ -147,6 +152,8 @@ router.post("/confirm", async (req, res) => {
       fechaIngreso,
       ...(sectorId ? { sectorId } : {}),
       ...(horasTeoricasDiarias !== undefined ? { horasTeoricasDiarias } : {}),
+      ...(fechaNacimiento ? { fechaNacimiento } : {}),
+      ...(genero ? { genero } : {}),
     };
     const existente = await prisma.employee.findUnique({ where: { legajo } });
     if (existente) {

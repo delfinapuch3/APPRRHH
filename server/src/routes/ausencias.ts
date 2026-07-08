@@ -24,7 +24,7 @@ const LABELS_TIPO: Record<string, string> = {
 
 function buildWhere(req: import("express").Request) {
   const scope = sectorScope(req);
-  const { employeeId, desde, hasta, justificada } = req.query as Record<string, string | undefined>;
+  const { employeeId, desde, hasta, justificada, excluirTipo } = req.query as Record<string, string | undefined>;
   const where: Record<string, unknown> = {};
   if (employeeId) where.employeeId = employeeId;
   if (desde || hasta) {
@@ -33,6 +33,7 @@ function buildWhere(req: import("express").Request) {
   }
   if (justificada === "true") where.justificada = true;
   if (justificada === "false") where.justificada = false;
+  if (excluirTipo) where.tipo = { not: excluirTipo };
   if (scope) where.employee = { sectorId: { in: scope } };
   return where;
 }

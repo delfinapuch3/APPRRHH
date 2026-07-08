@@ -11,31 +11,63 @@ interface LeafItem {
   icon: ComponentType<IconProps>;
   children?: undefined;
 }
+interface ChildItem {
+  to: string;
+  label: string;
+  icon: ComponentType<IconProps>;
+  adminOnly?: boolean;
+}
 interface GroupItem {
   label: string;
   adminOnly: boolean;
   icon: ComponentType<IconProps>;
-  children: { to: string; label: string }[];
+  children: ChildItem[];
   to?: undefined;
 }
 type NavItem = LeafItem | GroupItem;
 
 const navItems: NavItem[] = [
   { to: "/dashboard", label: "Panel de control", adminOnly: false, icon: IconDash },
-  { to: "/administracion", label: "Administración", adminOnly: false, icon: IconUsers },
+  {
+    label: "Administración",
+    adminOnly: false,
+    icon: IconUsers,
+    children: [
+      { to: "/administracion/empleados", label: "Empleados", icon: IconUsers },
+      { to: "/administracion/usuarios", label: "Usuarios", icon: IconKey, adminOnly: true },
+      { to: "/administracion/jornadas", label: "Jornadas", icon: IconClock, adminOnly: true },
+      { to: "/administracion/feriados", label: "Feriados", icon: IconCalendar, adminOnly: true },
+    ],
+  },
   { to: "/analitico-personal", label: "Analítico de personal", adminOnly: false, icon: IconChart },
   {
     label: "Control",
     adminOnly: false,
     icon: IconClock,
     children: [
-      { to: "/control/marcaciones", label: "Marcaciones" },
-      { to: "/control/licencias", label: "Licencias" },
-      { to: "/control/ausencias", label: "Ausencias" },
+      { to: "/control/marcaciones", label: "Marcaciones", icon: IconCheck },
+      { to: "/control/licencias", label: "Licencias", icon: IconFile },
+      { to: "/control/ausencias", label: "Ausencias", icon: IconAlert },
     ],
   },
-  { to: "/asistencia", label: "Asistencia", adminOnly: false, icon: IconCheck },
-  { to: "/vacaciones", label: "Vacaciones", adminOnly: false, icon: IconSun },
+  {
+    label: "Asistencia",
+    adminOnly: false,
+    icon: IconCheck,
+    children: [
+      { to: "/asistencia/periodo", label: "Por período", icon: IconCalendar },
+      { to: "/asistencia/dia", label: "Por día", icon: IconClock },
+    ],
+  },
+  {
+    label: "Vacaciones",
+    adminOnly: false,
+    icon: IconSun,
+    children: [
+      { to: "/vacaciones/empleado", label: "Por empleado", icon: IconUsers },
+      { to: "/vacaciones/historial", label: "Historial", icon: IconList },
+    ],
+  },
   { to: "/francos", label: "Francos", adminOnly: false, icon: IconCalendar },
   { to: "/liquidaciones", label: "Liquidaciones", adminOnly: true, icon: IconCash },
   { to: "/configuracion", label: "Configuración", adminOnly: true, icon: IconCog },
@@ -122,14 +154,15 @@ export function Layout() {
             const Icon = item.icon;
 
             if (item.children) {
-              const hijoActivo = item.children.some((c) => c.to === location.pathname);
+              const childrenVisibles = item.children.filter((c) => !c.adminOnly || isAdmin);
+              const hijoActivo = childrenVisibles.some((c) => c.to === location.pathname);
               // Sin espacio para desplegar sub-ítems en el riel de íconos: un
               // click en el grupo entra directo a su primera página.
               if (colapsado) {
                 return (
                   <NavLink
                     key={item.label}
-                    to={item.children[0].to}
+                    to={childrenVisibles[0].to}
                     onClick={() => setOpen(false)}
                     title={item.label}
                     className={`nav-link${hijoActivo ? " active" : ""}`}
@@ -162,14 +195,19 @@ export function Layout() {
                   </button>
                   {abierto && (
                     <div>
-                      {item.children.map((child) => (
+                      {childrenVisibles.map((child) => (
                         <NavLink
                           key={child.to}
                           to={child.to}
                           onClick={() => setOpen(false)}
                           className={({ isActive }) => `nav-link-sub${isActive ? " active" : ""}`}
                         >
-                          {child.label}
+                          {({ isActive }) => (
+                            <>
+                              <child.icon active={isActive} />
+                              <span>{child.label}</span>
+                            </>
+                          )}
                         </NavLink>
                       ))}
                     </div>
@@ -271,6 +309,40 @@ function IconClock({ active }: IconProps) {
   return (
     <svg width="16" height="16" fill="none" stroke={stroke(active)} strokeWidth="1.5" viewBox="0 0 24 24">
       <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function IconKey({ active }: IconProps) {
+  return (
+    <svg width="16" height="16" fill="none" stroke={stroke(active)} strokeWidth="1.5" viewBox="0 0 24 24">
+      <circle cx="7" cy="15" r="3" />
+      <path d="M9.5 12.5L19 3m-4 4l2 2m-5 1l2 2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function IconFile({ active }: IconProps) {
+  return (
+    <svg width="16" height="16" fill="none" stroke={stroke(active)} strokeWidth="1.5" viewBox="0 0 24 24">
+      <path d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M14 3v5h5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function IconAlert({ active }: IconProps) {
+  return (
+    <svg width="16" height="16" fill="none" stroke={stroke(active)} strokeWidth="1.5" viewBox="0 0 24 24">
+      <path
+        d="M12 9v4m0 4h.01M10.29 3.86l-8.18 14.18A2 2 0 004 21h16a2 2 0 001.89-2.96L13.71 3.86a2 2 0 00-3.42 0z"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+function IconList({ active }: IconProps) {
+  return (
+    <svg width="16" height="16" fill="none" stroke={stroke(active)} strokeWidth="1.5" viewBox="0 0 24 24">
+      <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

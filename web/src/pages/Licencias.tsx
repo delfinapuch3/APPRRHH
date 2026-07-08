@@ -18,7 +18,7 @@ export default function Licencias() {
   const [hasta, setHasta] = useState("");
 
   function buildQS() {
-    const qs = new URLSearchParams({ justificada: "true" });
+    const qs = new URLSearchParams({ justificada: "true", excluirTipo: "VACACIONES" });
     if (desde) qs.set("desde", desde);
     if (hasta) qs.set("hasta", hasta);
     return qs.toString();
