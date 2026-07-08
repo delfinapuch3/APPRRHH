@@ -77,9 +77,9 @@ export default function Configuracion() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-slate-800 mb-6">Configuración</h1>
+      <h1 className="page-header mb-6">Configuración</h1>
 
-      <div className="bg-white rounded-lg shadow-sm p-5 mb-6">
+      <div className="card p-5 mb-6">
         <h2 className="font-medium text-slate-700 mb-3">Reglas de cálculo de horas</h2>
         <div className="grid grid-cols-3 gap-4 mb-4">
           <div>
@@ -178,7 +178,7 @@ export default function Configuracion() {
       </div>
 
       <div className="grid grid-cols-3 gap-6 mb-6">
-        <div className="bg-white rounded-lg shadow-sm p-5">
+        <div className="card p-5">
           <h2 className="font-medium text-slate-700 mb-3">Empresas</h2>
           <ul className="text-sm mb-3 space-y-1">
             {empresas?.map((emp) => (
@@ -206,7 +206,7 @@ export default function Configuracion() {
           </form>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm p-5">
+        <div className="card p-5">
           <h2 className="font-medium text-slate-700 mb-3">Sectores</h2>
           <ul className="text-sm mb-3 space-y-1">
             {sectores?.map((s) => (
@@ -246,7 +246,7 @@ export default function Configuracion() {
           </form>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm p-5">
+        <div className="card p-5">
           <h2 className="font-medium text-slate-700 mb-3">Feriados</h2>
           <ul className="text-sm mb-3 space-y-1 max-h-40 overflow-auto">
             {feriados?.map((f) => (

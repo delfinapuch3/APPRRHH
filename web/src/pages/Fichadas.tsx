@@ -107,10 +107,10 @@ export default function Fichadas() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-slate-800 mb-6">Fichadas</h1>
+      <h1 className="page-header mb-6">Fichadas</h1>
 
       <div className="grid grid-cols-2 gap-6 mb-6">
-        <div className="bg-white rounded-lg shadow-sm p-5">
+        <div className="card p-5">
           <h2 className="font-medium text-slate-700 mb-3">Importar archivo del reloj</h2>
           <input
             type="file"
@@ -291,7 +291,7 @@ export default function Fichadas() {
           )}
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm p-5">
+        <div className="card p-5">
           <h2 className="font-medium text-slate-700 mb-3">Carga manual</h2>
           <form
             onSubmit={(e) => {
@@ -354,7 +354,7 @@ export default function Fichadas() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm p-5">
+      <div className="card p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-medium text-slate-700">Últimas fichadas</h2>
           <button

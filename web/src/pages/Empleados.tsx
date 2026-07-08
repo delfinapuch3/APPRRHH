@@ -175,7 +175,7 @@ export default function Empleados() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold text-slate-800">Empleados</h1>
+        <h1 className="page-header">Empleados</h1>
         <div className="flex items-center gap-4">
           <label className="flex items-center gap-2 text-sm text-slate-600">
             <input type="checkbox" checked={mostrarInactivos} onChange={(e) => setMostrarInactivos(e.target.checked)} />
@@ -225,7 +225,7 @@ export default function Empleados() {
       </div>
 
       {showImport && (
-        <div className="bg-white rounded-lg shadow-sm p-5 mb-6">
+        <div className="card p-5 mb-6">
           <h2 className="font-medium text-slate-700 mb-1">Importar planilla de empleados</h2>
           <p className="text-sm text-slate-500 mb-3">
             Subí un Excel/CSV con una fila por empleado. Columnas necesarias: Legajo, Nombre, Apellido y Valor hora
@@ -329,7 +329,7 @@ export default function Empleados() {
             e.preventDefault();
             crear.mutate();
           }}
-          className="bg-white rounded-lg shadow-sm p-5 mb-6 grid grid-cols-3 gap-4"
+          className="card p-5 mb-6 grid grid-cols-3 gap-4"
         >
           <div>
             <label className="block text-sm text-slate-600 mb-1">Legajo</label>
@@ -421,7 +421,7 @@ export default function Empleados() {
         </form>
       )}
 
-      <div className="bg-white rounded-lg shadow-sm p-5">
+      <div className="card p-5">
         {isLoading ? (
           <p className="text-slate-500">Cargando...</p>
         ) : (

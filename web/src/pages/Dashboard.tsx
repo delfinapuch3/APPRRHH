@@ -173,10 +173,10 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-slate-800 mb-1">Hola, {user?.nombre}</h1>
+      <h1 className="page-header mb-1">Hola, {user?.nombre}</h1>
       <p className="text-slate-500 mb-6">Resumen general</p>
 
-      <div className="flex gap-4 mb-6 bg-white rounded-lg shadow-sm p-4">
+      <div className="flex gap-4 mb-6 card p-4">
         <div>
           <label className="block text-xs text-slate-500 mb-1">Empresa</label>
           <select
@@ -243,7 +243,7 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm p-5 mb-6">
+      <div className="card p-5 mb-6">
         <h2 className="font-medium text-slate-700 mb-3">Top 10 ausencias (mes en curso)</h2>
         {topAusencias?.length === 0 && <p className="text-sm text-slate-500">Sin ausencias registradas.</p>}
         {topAusencias && topAusencias.length > 0 && (
@@ -273,7 +273,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow-sm p-5">
+        <div className="card p-5">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-medium text-slate-700">Horas trabajadas vs Teóricas por Sector</h2>
             <select
@@ -301,7 +301,7 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm p-5">
+        <div className="card p-5">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-medium text-slate-700">Horas extra por Sector</h2>
             <select
@@ -330,7 +330,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm p-5 mt-6">
+      <div className="card p-5 mt-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-medium text-slate-700">Costo de horas extra por Sector ($)</h2>
           <select

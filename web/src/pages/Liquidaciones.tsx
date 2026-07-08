@@ -84,9 +84,9 @@ export default function Liquidaciones() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-slate-800 mb-6">Liquidaciones</h1>
+      <h1 className="page-header mb-6">Liquidaciones</h1>
 
-      <div className="bg-white rounded-lg shadow-sm p-5 mb-6">
+      <div className="card p-5 mb-6">
         <h2 className="font-medium text-slate-700 mb-3">Generar liquidación</h2>
         <form
           onSubmit={(e) => {
@@ -152,7 +152,7 @@ export default function Liquidaciones() {
         {avisoSinValidar && <p className="text-amber-600 text-sm mt-2">{avisoSinValidar}</p>}
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm p-5 mb-6">
+      <div className="card p-5 mb-6">
         <h2 className="font-medium text-slate-700 mb-3">Planilla general (todo el personal)</h2>
         <div className="flex gap-3 items-end flex-wrap">
           <div>
@@ -183,7 +183,7 @@ export default function Liquidaciones() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm p-5">
+      <div className="card p-5">
         {isLoading ? (
           <p className="text-slate-500 text-sm">Cargando...</p>
         ) : (

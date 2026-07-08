@@ -43,9 +43,9 @@ export default function Vacaciones() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-slate-800 mb-6">Vacaciones</h1>
+      <h1 className="page-header mb-6">Vacaciones</h1>
 
-      <div className="flex gap-4 items-end mb-6 bg-white rounded-lg shadow-sm p-4">
+      <div className="flex gap-4 items-end mb-6 card p-4">
         <div>
           <label className="block text-xs text-slate-500 mb-1">Empleado</label>
           <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} className="border border-slate-300 rounded-md px-2 py-1.5 text-sm min-w-[220px]">
@@ -71,21 +71,21 @@ export default function Vacaciones() {
       {employeeId && balance && (
         <>
           <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="bg-white rounded-lg shadow-sm p-5">
+            <div className="card p-5">
               <div className="text-sm text-slate-500">Días correspondientes</div>
               <div className="text-3xl font-semibold mt-1">{balance.correspondientes}</div>
             </div>
-            <div className="bg-white rounded-lg shadow-sm p-5">
+            <div className="card p-5">
               <div className="text-sm text-slate-500">Días tomados</div>
               <div className="text-3xl font-semibold mt-1">{balance.tomados}</div>
             </div>
-            <div className="bg-white rounded-lg shadow-sm p-5">
+            <div className="card p-5">
               <div className="text-sm text-slate-500">Días restantes</div>
               <div className="text-3xl font-semibold text-primary mt-1">{balance.restantes}</div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-5 mb-6">
+          <div className="card p-5 mb-6">
             <h2 className="font-medium text-slate-700 mb-3">Cargar período tomado</h2>
             <form
               onSubmit={(e) => {
@@ -130,7 +130,7 @@ export default function Vacaciones() {
             </form>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-5">
+          <div className="card p-5">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-medium text-slate-700">Períodos tomados en {anio}</h2>
               <button

@@ -31,7 +31,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex" style={{ fontFamily: "'DM Sans', sans-serif", background: "#F1F5F9" }}>
+    <div className="min-h-screen flex" style={{ fontFamily: "'Public Sans', sans-serif", background: "#F1F5F9" }}>
       {/* Left panel */}
       <div
         className="login-left"
@@ -73,7 +73,7 @@ export default function Login() {
         <div style={{ position: "relative", zIndex: 1 }}>
           <h1
             style={{
-              fontFamily: "'Syne', sans-serif",
+              fontFamily: "'Public Sans', sans-serif",
               fontWeight: 800,
               fontSize: "clamp(26px, 3vw, 40px)",
               color: "#F1F5F9",
@@ -91,7 +91,7 @@ export default function Login() {
           <div style={{ display: "flex", gap: 32, marginTop: 40 }}>
             {highlights.map((s) => (
               <div key={s.v}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 20, color: "#46B869" }}>{s.v}</div>
+                <div style={{ fontFamily: "'Public Sans', sans-serif", fontWeight: 700, fontSize: 20, color: "#46B869" }}>{s.v}</div>
                 <div style={{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: ".08em" }}>{s.l}</div>
               </div>
             ))}
@@ -107,7 +107,7 @@ export default function Login() {
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "48px 24px" }}>
         <div style={{ width: "100%", maxWidth: 380 }}>
           <div style={{ marginBottom: 40 }}>
-            <h2 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 26, color: "#0F172A", marginBottom: 8 }}>
+            <h2 style={{ fontFamily: "'Public Sans', sans-serif", fontWeight: 700, fontSize: 26, color: "#0F172A", marginBottom: 8 }}>
               Bienvenido
             </h2>
             <p style={{ color: "#64748B", fontSize: 14 }}>Ingresá con tu cuenta para continuar.</p>

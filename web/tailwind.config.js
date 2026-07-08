@@ -40,14 +40,14 @@ export default {
         },
       },
       fontFamily: {
-        heading: ["Syne", "sans-serif"],
-        sans: ["DM Sans", "sans-serif"],
+        heading: ["Public Sans", "sans-serif"],
+        sans: ["Public Sans", "sans-serif"],
         mono: ["JetBrains Mono", "monospace"],
       },
       boxShadow: {
-        card: "0 1px 2px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.1)",
-        soft: "0 4px 6px -1px rgba(0,0,0,.08), 0 2px 4px -2px rgba(0,0,0,.06)",
-        lift: "0 10px 15px -3px rgba(0,0,0,.08), 0 4px 6px -4px rgba(0,0,0,.05)",
+        card: "0 1px 2px rgba(15,27,20,.05), 0 1px 3px rgba(15,27,20,.08)",
+        soft: "0 4px 8px -2px rgba(15,27,20,.08), 0 2px 4px -2px rgba(15,27,20,.05)",
+        lift: "0 12px 24px -6px rgba(15,27,20,.12), 0 4px 8px -4px rgba(15,27,20,.06)",
       },
       borderRadius: {
         card: "12px",

@@ -196,7 +196,7 @@ export default function EmpleadoDetalle() {
   return (
     <div>
       <div className="flex items-start justify-between mb-1">
-        <h1 className="text-2xl font-semibold text-slate-800">
+        <h1 className="page-header">
           {empleado.apellido}, {empleado.nombre}
           {!empleado.activo && <span className="ml-2 text-sm font-normal text-red-600">(inactivo)</span>}
         </h1>
@@ -241,7 +241,7 @@ export default function EmpleadoDetalle() {
             e.preventDefault();
             guardarEdicion.mutate();
           }}
-          className="bg-white rounded-lg shadow-sm p-5 mb-6 grid grid-cols-3 gap-4"
+          className="card p-5 mb-6 grid grid-cols-3 gap-4"
         >
           <div>
             <label className="block text-sm text-slate-600 mb-1">Nombre</label>
@@ -338,7 +338,7 @@ export default function EmpleadoDetalle() {
         ))}
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm p-5">
+      <div className="card p-5">
         {tab === "fichadas" && (
           <div>
             <div className="flex gap-3 items-end mb-4">

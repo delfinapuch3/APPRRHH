@@ -78,7 +78,7 @@ export default function Asistencia() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-slate-800 mb-6">Asistencia</h1>
+      <h1 className="page-header mb-6">Asistencia</h1>
 
       <div className="flex gap-2 mb-6">
         <button
@@ -97,7 +97,7 @@ export default function Asistencia() {
 
       {vista === "periodo" && (
         <>
-          <div className="flex gap-4 items-end mb-6 bg-white rounded-lg shadow-sm p-4">
+          <div className="flex gap-4 items-end mb-6 card p-4">
             <div>
               <label className="block text-xs text-slate-500 mb-1">Desde</label>
               <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="border border-slate-300 rounded-md px-2 py-1.5 text-sm" />
@@ -125,7 +125,7 @@ export default function Asistencia() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-5 mb-6">
+          <div className="card p-5 mb-6">
             <h2 className="font-medium text-slate-700 mb-3">Faltas sin clasificar ({faltas?.length ?? 0})</h2>
             {faltas?.length === 0 && <p className="text-sm text-slate-500">No hay faltas pendientes de clasificar en el período.</p>}
             {faltas && faltas.length > 0 && (
@@ -165,7 +165,7 @@ export default function Asistencia() {
             )}
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-5">
+          <div className="card p-5">
             <h2 className="font-medium text-slate-700 mb-3">Asistencia por empleado</h2>
             {isLoading ? (
               <p className="text-slate-500 text-sm">Cargando...</p>
@@ -205,7 +205,7 @@ export default function Asistencia() {
 
       {vista === "dia" && (
         <>
-          <div className="flex gap-4 items-end mb-6 bg-white rounded-lg shadow-sm p-4">
+          <div className="flex gap-4 items-end mb-6 card p-4">
             <div>
               <label className="block text-xs text-slate-500 mb-1">Día</label>
               <input
@@ -217,7 +217,7 @@ export default function Asistencia() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-5">
+          <div className="card p-5">
             <h2 className="font-medium text-slate-700 mb-3">
               Quién faltó el {new Date(diaSeleccionado).toLocaleDateString("es-AR", { timeZone: "UTC" })}
             </h2>

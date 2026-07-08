@@ -33,7 +33,7 @@ export default function Francos() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold text-slate-800">Francos compensatorios</h1>
+        <h1 className="page-header">Francos compensatorios</h1>
         <button onClick={exportar} className="text-sm text-primary hover:underline">
           Exportar
         </button>
@@ -51,7 +51,7 @@ export default function Francos() {
         ))}
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm p-5">
+      <div className="card p-5">
         {isLoading ? (
           <p className="text-slate-500 text-sm">Cargando...</p>
         ) : (
