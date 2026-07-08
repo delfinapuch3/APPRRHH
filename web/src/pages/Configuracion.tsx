@@ -25,7 +25,7 @@ export default function Configuracion() {
   const { data: sectores } = useQuery({
     queryKey: ["sectores"],
     queryFn: async () =>
-      (await api.get("/sectores")).data as { id: string; nombre: string; empresa: { nombre: string } | null }[],
+      (await api.get("/sectores")).data as { id: string; nombre: string; activo: boolean; empresa: { nombre: string } | null }[],
   });
 
   const [local, setLocal] = useState<Config | null>(null);
@@ -54,6 +54,10 @@ export default function Configuracion() {
       queryClient.invalidateQueries({ queryKey: ["sectores"] });
       setNuevoSector({ nombre: "", empresaId: "" });
     },
+  });
+  const toggleSector = useMutation({
+    mutationFn: async ({ id, activo }: { id: string; activo: boolean }) => api.put(`/sectores/${id}`, { activo }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["sectores"] }),
   });
 
   if (!local) return <p className="text-slate-500">Cargando...</p>;
@@ -193,8 +197,17 @@ export default function Configuracion() {
           <h2 className="font-medium text-slate-700 mb-3">Sectores</h2>
           <ul className="text-sm mb-3 space-y-1">
             {sectores?.map((s) => (
-              <li key={s.id} className="text-slate-600">
-                {s.nombre} {s.empresa ? `(${s.empresa.nombre})` : ""}
+              <li key={s.id} className={`flex items-center justify-between gap-2 ${s.activo ? "text-slate-600" : "text-slate-400"}`}>
+                <span>
+                  {s.nombre} {s.empresa ? `(${s.empresa.nombre})` : ""}
+                  {!s.activo && <span className="ml-1 text-xs">· inactivo</span>}
+                </span>
+                <button
+                  onClick={() => toggleSector.mutate({ id: s.id, activo: !s.activo })}
+                  className="text-xs underline text-slate-500 hover:text-slate-700 whitespace-nowrap"
+                >
+                  {s.activo ? "Desactivar" : "Reactivar"}
+                </button>
               </li>
             ))}
           </ul>

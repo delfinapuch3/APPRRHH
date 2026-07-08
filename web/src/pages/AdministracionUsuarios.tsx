@@ -6,6 +6,7 @@ import { useAuth } from "../auth/AuthContext.js";
 interface Sector {
   id: string;
   nombre: string;
+  activo?: boolean;
 }
 
 interface Usuario {
@@ -146,7 +147,7 @@ export default function AdministracionUsuarios() {
               <div>
                 <label className="section-title block mb-1.5">Sectores</label>
                 <div className="max-h-40 overflow-auto border border-content-border rounded-lg p-2 space-y-1">
-                  {sectores.map((s) => (
+                  {sectores.filter((s) => s.activo !== false).map((s) => (
                     <label key={s.id} className="flex items-center gap-2 text-sm text-ink-secondary">
                       <input
                         type="checkbox"
@@ -277,7 +278,7 @@ export default function AdministracionUsuarios() {
                 <div>
                   <label className="section-title block mb-1.5">Sectores</label>
                   <div className="max-h-40 overflow-auto border border-content-border rounded-lg p-2 space-y-1">
-                    {sectores.map((s) => (
+                    {sectores.filter((s) => s.activo !== false).map((s) => (
                       <label key={s.id} className="flex items-center gap-2 text-sm text-ink-secondary">
                         <input
                           type="checkbox"

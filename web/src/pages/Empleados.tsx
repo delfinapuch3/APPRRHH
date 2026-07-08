@@ -20,6 +20,7 @@ interface Empleado {
 interface Sector {
   id: string;
   nombre: string;
+  activo?: boolean;
 }
 
 interface Jornada {
@@ -45,6 +46,7 @@ const MAPPING_FIELDS = [
   ["sindicato", "Sindicato (opcional)"],
   ["valorHoraNormal", "Valor hora normal"],
   ["fechaIngreso", "Fecha de ingreso"],
+  ["empresa", "Empresa (opcional)"],
   ["sector", "Sector (opcional)"],
   ["horasTeoricasDiarias", "Horas teóricas diarias (opcional)"],
   ["fechaNacimiento", "Fecha de nacimiento (opcional)"],
@@ -131,6 +133,7 @@ export default function Empleados() {
     sindicato: "",
     valorHoraNormal: "",
     fechaIngreso: "",
+    empresa: "",
     sector: "",
     horasTeoricasDiarias: "",
     fechaNacimiento: "",
@@ -147,6 +150,7 @@ export default function Empleados() {
       sindicato: guess("sindicato"),
       valorHoraNormal: guess("hora"),
       fechaIngreso: guess("ingreso"),
+      empresa: guess("empresa"),
       sector: guess("sector"),
       horasTeoricasDiarias: guess("teoric"),
       fechaNacimiento: guess("nacimiento"),
@@ -427,7 +431,7 @@ export default function Empleados() {
               className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
             >
               <option value="">Sin asignar</option>
-              {sectores?.map((s) => (
+              {sectores?.filter((s) => s.activo !== false).map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.nombre}
                 </option>

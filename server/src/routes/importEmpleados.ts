@@ -11,7 +11,7 @@ const router = Router();
 router.use(requireAdmin);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-const KEYWORDS = ["legajo", "nombre", "apellido", "hora", "sindicato", "sector"];
+const KEYWORDS = ["legajo", "nombre", "apellido", "hora", "sindicato", "sector", "empresa"];
 
 interface CachedImport {
   sheetNames: string[];
@@ -73,6 +73,7 @@ const confirmSchema = z.object({
     valorHoraNormal: z.string(),
     fechaIngreso: z.string().optional(),
     sindicato: z.string().optional(),
+    empresa: z.string().optional(),
     sector: z.string().optional(),
     horasTeoricasDiarias: z.string().optional(),
     fechaNacimiento: z.string().optional(),
@@ -89,8 +90,38 @@ router.post("/confirm", async (req, res) => {
   const hoja = entry.sheets[sheet];
   if (!hoja) return res.status(400).json({ error: "Esa hoja no existe en el archivo" });
 
+  const empresas = await prisma.empresa.findMany();
+  const empresaByNombre = new Map(empresas.map((e) => [e.nombre.trim().toLowerCase(), e.id]));
   const sectores = await prisma.sector.findMany();
-  const sectorByNombre = new Map(sectores.map((s) => [s.nombre.trim().toLowerCase(), s.id]));
+  // Clave por (empresa, nombre) para desambiguar sectores homónimos en distintas empresas.
+  const sectorByEmpresaNombre = new Map(sectores.map((s) => [`${s.empresaId ?? ""}::${s.nombre.trim().toLowerCase()}`, s.id]));
+  // Fallback: primer sector con ese nombre, para filas que traen sector pero no empresa.
+  const sectorByNombreGlobal = new Map<string, string>();
+  for (const s of sectores) {
+    const k = s.nombre.trim().toLowerCase();
+    if (!sectorByNombreGlobal.has(k)) sectorByNombreGlobal.set(k, s.id);
+  }
+
+  async function resolverEmpresaId(nombre: string): Promise<string> {
+    const key = nombre.toLowerCase();
+    const existente = empresaByNombre.get(key);
+    if (existente) return existente;
+    const creada = await prisma.empresa.create({ data: { nombre } });
+    empresaByNombre.set(key, creada.id);
+    return creada.id;
+  }
+
+  async function resolverSectorId(nombre: string, empresaId: string): Promise<string> {
+    const key = `${empresaId}::${nombre.toLowerCase()}`;
+    const existente = sectorByEmpresaNombre.get(key);
+    if (existente) return existente;
+    const creado = await prisma.sector.create({ data: { nombre, empresaId } });
+    sectorByEmpresaNombre.set(key, creado.id);
+    const gk = nombre.toLowerCase();
+    if (!sectorByNombreGlobal.has(gk)) sectorByNombreGlobal.set(gk, creado.id);
+    return creado.id;
+  }
+
   const hoy = utcDateOnlyFrom(new Date());
 
   const errores: string[] = [];
@@ -123,16 +154,21 @@ router.post("/confirm", async (req, res) => {
     const sindicato = mapping.sindicato ? String(row[mapping.sindicato] ?? "").trim() || null : null;
 
     let sectorId: string | null = null;
-    if (mapping.sector) {
-      const sectorNombre = String(row[mapping.sector] ?? "").trim();
-      if (sectorNombre) {
-        const match = sectorByNombre.get(sectorNombre.toLowerCase());
-        if (match) {
-          sectorId = match;
-        } else {
-          errores.push(`Fila ${idx + 2}: sector "${sectorNombre}" no encontrado, se dejó sin asignar`);
-        }
+    const empresaNombre = mapping.empresa ? String(row[mapping.empresa] ?? "").trim() : "";
+    const sectorNombre = mapping.sector ? String(row[mapping.sector] ?? "").trim() : "";
+    const empresaId = empresaNombre ? await resolverEmpresaId(empresaNombre) : null;
+    if (sectorNombre) {
+      if (empresaId) {
+        // Empresa + sector: se resuelve (o crea) el sector bajo esa empresa.
+        sectorId = await resolverSectorId(sectorNombre, empresaId);
+      } else {
+        // Sector sin empresa: solo se busca por nombre, no se crea.
+        const match = sectorByNombreGlobal.get(sectorNombre.toLowerCase());
+        if (match) sectorId = match;
+        else errores.push(`Fila ${idx + 2}: sector "${sectorNombre}" no encontrado, se dejó sin asignar`);
       }
+    } else if (empresaNombre) {
+      errores.push(`Fila ${idx + 2}: empresa "${empresaNombre}" sin sector; el empleado quedó sin sector (la empresa se asigna a través del sector)`);
     }
 
     let horasTeoricasDiarias: number | undefined;

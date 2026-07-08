@@ -40,15 +40,16 @@ interface PorEmpresa {
   cantidad: number;
 }
 
-const COLORES = ["#0ea5e9", "#f59e0b", "#94a3b8", "#8b5cf6", "#ef4444", "#22c55e"];
+// Paleta de marca: verde cantera + ámbar y sus tintes.
+const COLORES = ["#1E7D34", "#E8A020", "#46B869", "#C17F10", "#0E7C86", "#94A3B8"];
 
 function StatCard({ titulo, valor, sufijo }: { titulo: string; valor: string | number; sufijo?: string }) {
   return (
     <div className="card p-5">
-      <div className="text-sm text-slate-500">{titulo}</div>
-      <div className="text-3xl font-semibold mt-1">
+      <div className="section-title">{titulo}</div>
+      <div className="font-heading text-3xl font-bold text-ink-primary mt-2">
         {valor}
-        {sufijo && <span className="text-lg text-slate-400 ml-1">{sufijo}</span>}
+        {sufijo && <span className="text-lg text-ink-muted ml-1">{sufijo}</span>}
       </div>
     </div>
   );
@@ -89,21 +90,21 @@ export default function AnaliticoPersonal() {
       </div>
 
       <div className="card p-5 mb-6">
-        <h2 className="font-medium text-slate-700 mb-3">Índice de ausentismo por mes</h2>
+        <h2 className="section-title mb-3">Índice de ausentismo por mes</h2>
         <ResponsiveContainer width="100%" height={260}>
           <LineChart data={ausentismoPorMes}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
             <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${v}%`} />
             <Tooltip formatter={(v) => `${v}%`} />
-            <Line type="monotone" dataKey="ausentismo" name="Ausentismo" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
+            <Line type="monotone" dataKey="ausentismo" name="Ausentismo" stroke="#E8A020" strokeWidth={2} dot={{ r: 3 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div className="card p-5">
-          <h2 className="font-medium text-slate-700 mb-3">Empleados por género</h2>
+          <h2 className="section-title mb-3">Empleados por género</h2>
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
               <Pie data={porGenero} dataKey="cantidad" nameKey="genero" cx="50%" cy="50%" outerRadius={90} label>
@@ -116,7 +117,7 @@ export default function AnaliticoPersonal() {
         </div>
 
         <div className="card p-5">
-          <h2 className="font-medium text-slate-700 mb-3">Empleados por empresa</h2>
+          <h2 className="section-title mb-3">Empleados por empresa</h2>
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
               <Pie data={porEmpresa} dataKey="cantidad" nameKey="empresa" cx="50%" cy="50%" outerRadius={90} label>
@@ -130,14 +131,14 @@ export default function AnaliticoPersonal() {
       </div>
 
       <div className="card p-5">
-        <h2 className="font-medium text-slate-700 mb-3">Empleados por antigüedad</h2>
+        <h2 className="section-title mb-3">Empleados por antigüedad</h2>
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={porAntiguedad}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="rango" tick={{ fontSize: 12 }} />
             <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
             <Tooltip />
-            <Bar dataKey="cantidad" name="Empleados" fill="#0ea5e9" />
+            <Bar dataKey="cantidad" name="Empleados" fill="#1E7D34" />
           </BarChart>
         </ResponsiveContainer>
       </div>
