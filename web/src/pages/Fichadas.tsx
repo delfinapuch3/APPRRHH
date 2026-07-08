@@ -107,7 +107,7 @@ export default function Fichadas() {
 
   return (
     <div>
-      <h1 className="page-header mb-6">Fichadas</h1>
+      <h1 className="page-header mb-6">Marcaciones</h1>
 
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div className="card p-5">

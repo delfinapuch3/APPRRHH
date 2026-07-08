@@ -111,6 +111,8 @@ model Employee {
   nombre                   String
   apellido                 String
   sindicato                String?
+  fechaNacimiento          DateTime?
+  genero                   String?
   fechaIngreso             DateTime
   valorHoraNormal          Float
   horasTeoricasDiarias     Float    @default(8)

@@ -1,18 +1,39 @@
 import { useEffect, useState, type ComponentType } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext.js";
 
 type IconProps = { active?: boolean };
 
-const navItems: {
+interface LeafItem {
   to: string;
   label: string;
   adminOnly: boolean;
   icon: ComponentType<IconProps>;
-}[] = [
+  children?: undefined;
+}
+interface GroupItem {
+  label: string;
+  adminOnly: boolean;
+  icon: ComponentType<IconProps>;
+  children: { to: string; label: string }[];
+  to?: undefined;
+}
+type NavItem = LeafItem | GroupItem;
+
+const navItems: NavItem[] = [
   { to: "/dashboard", label: "Panel de control", adminOnly: false, icon: IconDash },
   { to: "/administracion", label: "Administración", adminOnly: false, icon: IconUsers },
-  { to: "/fichadas", label: "Fichadas", adminOnly: false, icon: IconClock },
+  { to: "/analitico-personal", label: "Analítico de personal", adminOnly: false, icon: IconChart },
+  {
+    label: "Control",
+    adminOnly: false,
+    icon: IconClock,
+    children: [
+      { to: "/control/marcaciones", label: "Marcaciones" },
+      { to: "/control/licencias", label: "Licencias" },
+      { to: "/control/ausencias", label: "Ausencias" },
+    ],
+  },
   { to: "/asistencia", label: "Asistencia", adminOnly: false, icon: IconCheck },
   { to: "/vacaciones", label: "Vacaciones", adminOnly: false, icon: IconSun },
   { to: "/francos", label: "Francos", adminOnly: false, icon: IconCalendar },
@@ -24,12 +45,21 @@ const SIDEBAR_COLAPSADO_KEY = "sidebarColapsado";
 
 export function Layout() {
   const { user, logout, isAdmin } = useAuth();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
   const [colapsado, setColapsado] = useState(() => localStorage.getItem(SIDEBAR_COLAPSADO_KEY) === "1");
+  const [grupoAbierto, setGrupoAbierto] = useState<string | null>(null);
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_COLAPSADO_KEY, colapsado ? "1" : "0");
   }, [colapsado]);
+
+  // Si la ruta actual pertenece a un grupo desplegable (ej. entré directo a
+  // /control/licencias por un link externo), lo abre automáticamente.
+  useEffect(() => {
+    const grupoActivo = navItems.find((i) => i.children?.some((c) => c.to === location.pathname));
+    if (grupoActivo) setGrupoAbierto(grupoActivo.label);
+  }, [location.pathname]);
 
   const items = navItems.filter((i) => !i.adminOnly || isAdmin);
 
@@ -90,6 +120,64 @@ export function Layout() {
         <nav className="flex-1 py-3 px-2.5 overflow-y-auto">
           {items.map((item) => {
             const Icon = item.icon;
+
+            if (item.children) {
+              const hijoActivo = item.children.some((c) => c.to === location.pathname);
+              // Sin espacio para desplegar sub-ítems en el riel de íconos: un
+              // click en el grupo entra directo a su primera página.
+              if (colapsado) {
+                return (
+                  <NavLink
+                    key={item.label}
+                    to={item.children[0].to}
+                    onClick={() => setOpen(false)}
+                    title={item.label}
+                    className={`nav-link${hijoActivo ? " active" : ""}`}
+                  >
+                    <Icon active={hijoActivo} />
+                  </NavLink>
+                );
+              }
+              const abierto = grupoAbierto === item.label;
+              return (
+                <div key={item.label}>
+                  <button
+                    type="button"
+                    onClick={() => setGrupoAbierto(abierto ? null : item.label)}
+                    className={`nav-link${hijoActivo ? " active" : ""}`}
+                  >
+                    <Icon active={hijoActivo} />
+                    <span style={{ flex: 1 }}>{item.label}</span>
+                    <svg
+                      width="12"
+                      height="12"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                      style={{ transform: abierto ? "rotate(180deg)" : "none", transition: "transform .15s" }}
+                    >
+                      <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  {abierto && (
+                    <div>
+                      {item.children.map((child) => (
+                        <NavLink
+                          key={child.to}
+                          to={child.to}
+                          onClick={() => setOpen(false)}
+                          className={({ isActive }) => `nav-link-sub${isActive ? " active" : ""}`}
+                        >
+                          {child.label}
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
             return (
               <NavLink
                 key={item.to}
@@ -162,6 +250,13 @@ function IconDash({ active }: IconProps) {
     <svg width="16" height="16" fill="none" stroke={stroke(active)} strokeWidth="1.5" viewBox="0 0 24 24">
       <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
       <rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  );
+}
+function IconChart({ active }: IconProps) {
+  return (
+    <svg width="16" height="16" fill="none" stroke={stroke(active)} strokeWidth="1.5" viewBox="0 0 24 24">
+      <path d="M3 3v18h18M8 17V10m5 7V6m5 11v-4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

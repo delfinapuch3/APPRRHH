@@ -6,11 +6,14 @@ import Dashboard from "./pages/Dashboard.js";
 import Administracion from "./pages/Administracion.js";
 import EmpleadoDetalle from "./pages/EmpleadoDetalle.js";
 import Fichadas from "./pages/Fichadas.js";
+import Licencias from "./pages/Licencias.js";
+import Ausencias from "./pages/Ausencias.js";
 import Asistencia from "./pages/Asistencia.js";
 import Vacaciones from "./pages/Vacaciones.js";
 import Francos from "./pages/Francos.js";
 import Liquidaciones from "./pages/Liquidaciones.js";
 import Configuracion from "./pages/Configuracion.js";
+import AnaliticoPersonal from "./pages/AnaliticoPersonal.js";
 
 export default function App() {
   return (
@@ -22,7 +25,10 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/administracion" element={<Administracion />} />
           <Route path="/empleados/:id" element={<EmpleadoDetalle />} />
-          <Route path="/fichadas" element={<Fichadas />} />
+          <Route path="/analitico-personal" element={<AnaliticoPersonal />} />
+          <Route path="/control/marcaciones" element={<Fichadas />} />
+          <Route path="/control/licencias" element={<Licencias />} />
+          <Route path="/control/ausencias" element={<Ausencias />} />
           <Route path="/asistencia" element={<Asistencia />} />
           <Route path="/vacaciones" element={<Vacaciones />} />
           <Route path="/francos" element={<Francos />} />

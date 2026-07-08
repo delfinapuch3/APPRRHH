@@ -24,13 +24,15 @@ const LABELS_TIPO: Record<string, string> = {
 
 function buildWhere(req: import("express").Request) {
   const scope = sectorScope(req);
-  const { employeeId, desde, hasta } = req.query as Record<string, string | undefined>;
+  const { employeeId, desde, hasta, justificada } = req.query as Record<string, string | undefined>;
   const where: Record<string, unknown> = {};
   if (employeeId) where.employeeId = employeeId;
   if (desde || hasta) {
     where.fechaDesde = { ...(hasta ? { lte: new Date(hasta) } : {}) };
     where.fechaHasta = { ...(desde ? { gte: new Date(desde) } : {}) };
   }
+  if (justificada === "true") where.justificada = true;
+  if (justificada === "false") where.justificada = false;
   if (scope) where.employee = { sectorId: { in: scope } };
   return where;
 }

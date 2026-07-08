@@ -337,6 +337,23 @@
     background: var(--sidebar-active);
     border-left: 2px solid var(--primary-tint);
   }
+  button.nav-link { width: 100%; text-align: left; font: inherit; cursor: pointer; background: transparent; border: none; border-left: 2px solid transparent; }
+
+  /* Sub-ítems de un grupo desplegable (ej. Control > Marcaciones/Licencias/Ausencias) */
+  .nav-link-sub {
+    display: flex;
+    align-items: center;
+    padding: 7px 12px 7px 34px;
+    border-radius: 8px;
+    margin-bottom: 2px;
+    font-family: 'Public Sans', sans-serif;
+    font-size: 13px;
+    color: var(--sidebar-text);
+    text-decoration: none;
+    transition: all .15s;
+  }
+  .nav-link-sub:hover { background: var(--sidebar-hover); }
+  .nav-link-sub.active { font-weight: 600; color: var(--primary-tint); background: var(--sidebar-active); }
 }
 
 @media (max-width: 768px) {
