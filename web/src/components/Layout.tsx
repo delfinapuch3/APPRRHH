@@ -136,11 +136,7 @@ export function Layout() {
 }
 
 function Logo({ width = 150 }: { width?: number }) {
-  return (
-    <div className="bg-white rounded-lg p-2 inline-block">
-      <img src="/logo.png" alt="POLYSAN S.A. / POLCECAL S.A." style={{ width, display: "block" }} />
-    </div>
-  );
+  return <img src="/logo.png" alt="POLYSAN S.A. / POLCECAL S.A." width={width} style={{ objectFit: "contain" }} />;
 }
 
 /* ─── Nav Icons ─── */

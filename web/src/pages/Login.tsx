@@ -67,9 +67,7 @@ export default function Login() {
         />
 
         <div style={{ position: "relative", zIndex: 1 }}>
-          <div style={{ background: "#fff", borderRadius: 12, padding: 12, display: "inline-block" }}>
-            <img src="/logo.png" alt="POLYSAN S.A. / POLCECAL S.A." width={180} style={{ display: "block" }} />
-          </div>
+          <img src="/logo.png" alt="POLYSAN S.A. / POLCECAL S.A." width={200} style={{ objectFit: "contain" }} />
         </div>
 
         <div style={{ position: "relative", zIndex: 1 }}>
