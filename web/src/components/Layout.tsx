@@ -35,7 +35,7 @@ const navItems: NavItem[] = [
     children: [
       { to: "/administracion/empleados", label: "Empleados", icon: IconUsers },
       { to: "/administracion/usuarios", label: "Usuarios", icon: IconKey, adminOnly: true },
-      { to: "/administracion/jornadas", label: "Jornadas", icon: IconClock, adminOnly: true },
+      { to: "/administracion/jornadas", label: "Turnos", icon: IconClock, adminOnly: true },
       { to: "/administracion/feriados", label: "Feriados", icon: IconCalendar, adminOnly: true },
     ],
   },

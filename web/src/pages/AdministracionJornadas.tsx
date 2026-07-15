@@ -7,7 +7,6 @@ interface Jornada {
   nombre: string;
   horaInicio: string;
   horaFin: string;
-  redondeoMinutos: number;
   toleranciaMinutos: number;
   activo: boolean;
 }
@@ -23,8 +22,7 @@ export default function AdministracionJornadas() {
     nombre: "",
     horaInicio: "08:00",
     horaFin: "16:00",
-    redondeoMinutos: "0",
-    toleranciaMinutos: "0",
+    toleranciaMinutos: "15",
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -34,12 +32,11 @@ export default function AdministracionJornadas() {
         nombre: form.nombre,
         horaInicio: form.horaInicio,
         horaFin: form.horaFin,
-        redondeoMinutos: Number(form.redondeoMinutos),
         toleranciaMinutos: Number(form.toleranciaMinutos),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["jornadas"] });
-      setForm({ nombre: "", horaInicio: "08:00", horaFin: "16:00", redondeoMinutos: "0", toleranciaMinutos: "0" });
+      setForm({ nombre: "", horaInicio: "08:00", horaFin: "16:00", toleranciaMinutos: "15" });
     },
   });
 
@@ -54,12 +51,14 @@ export default function AdministracionJornadas() {
 
   return (
     <div>
-      <h1 className="page-header mb-6">Jornadas</h1>
+      <h1 className="page-header mb-6">Turnos</h1>
       <div className="grid grid-cols-3 gap-6">
         <div className="card p-5 col-span-1">
-          <h2 className="font-medium text-slate-700 mb-3">Nueva jornada</h2>
+          <h2 className="font-medium text-slate-700 mb-3">Nuevo turno</h2>
           <p className="text-xs text-slate-500 mb-3">
-            Ej. Oficina 08:00 a 16:00, o turnos rotativos 04:00-12:00 / 12:00-20:00 / 20:00-04:00.
+            Ej. Oficina 08:00 a 16:00, o turnos rotativos Mañana 04:00-12:00 / Tarde 12:00-20:00 / Noche 20:00-04:00.
+            No hace falta asignarlos a cada empleado: todos los días, el sistema detecta automáticamente cuál de
+            estos turnos activos es el más parecido a la marcación real.
           </p>
           <form
             onSubmit={(e) => {
@@ -102,20 +101,12 @@ export default function AdministracionJornadas() {
             </div>
             <div>
               <label className="block text-xs text-slate-500 mb-1">
-                Redondeo (minutos) <span className="text-slate-400">— ej. 60 = redondea 7.9hs a 8hs</span>
-              </label>
-              <input
-                type="number"
-                min={0}
-                max={60}
-                value={form.redondeoMinutos}
-                onChange={(e) => setForm({ ...form, redondeoMinutos: e.target.value })}
-                className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">
-                Tolerancia llegada tarde (minutos) <span className="text-slate-400">— 0 = sin margen</span>
+                Margen (minutos){" "}
+                <span className="text-slate-400">
+                  — un desvío de hasta este margen (para llegar o para salir) se redondea a la hora exacta del
+                  turno; pasado este margen, la entrada se marca como tardanza y la salida como hora extra a
+                  validar
+                </span>
               </label>
               <input
                 type="number"
@@ -131,13 +122,13 @@ export default function AdministracionJornadas() {
               disabled={crear.isPending}
               className="w-full bg-primary text-white text-sm px-4 py-2 rounded-md hover:bg-primary-dark disabled:opacity-50"
             >
-              {crear.isPending ? "Guardando..." : "Agregar jornada"}
+              {crear.isPending ? "Guardando..." : "Agregar turno"}
             </button>
           </form>
         </div>
 
         <div className="card p-5 col-span-2">
-          <h2 className="font-medium text-slate-700 mb-3">Jornadas definidas</h2>
+          <h2 className="font-medium text-slate-700 mb-3">Turnos definidos</h2>
           {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
           {isLoading ? (
             <p className="text-slate-500 text-sm">Cargando...</p>
@@ -147,8 +138,7 @@ export default function AdministracionJornadas() {
                 <tr className="text-left text-slate-500 border-b">
                   <th className="pb-2">Nombre</th>
                   <th className="pb-2">Horario</th>
-                  <th className="pb-2">Redondeo</th>
-                  <th className="pb-2">Tolerancia</th>
+                  <th className="pb-2">Margen</th>
                   <th className="pb-2"></th>
                 </tr>
               </thead>
@@ -159,8 +149,7 @@ export default function AdministracionJornadas() {
                     <td className="py-2">
                       {j.horaInicio} - {j.horaFin}
                     </td>
-                    <td className="py-2">{j.redondeoMinutos > 0 ? `${j.redondeoMinutos} min` : "-"}</td>
-                    <td className="py-2">{j.toleranciaMinutos > 0 ? `${j.toleranciaMinutos} min` : "-"}</td>
+                    <td className="py-2">{j.toleranciaMinutos} min</td>
                     <td className="py-2 text-right">
                       <button onClick={() => eliminar.mutate(j.id)} className="text-red-500 text-xs">
                         eliminar
@@ -170,8 +159,8 @@ export default function AdministracionJornadas() {
                 ))}
                 {jornadas?.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="py-4 text-center text-slate-400">
-                      Todavía no hay jornadas definidas
+                    <td colSpan={4} className="py-4 text-center text-slate-400">
+                      Todavía no hay turnos definidos
                     </td>
                   </tr>
                 )}

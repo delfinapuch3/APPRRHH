@@ -17,21 +17,20 @@ interface Empleado {
   valorHoraNormal: number;
   horasTeoricasDiarias: number;
   activo: boolean;
+  empresaId: string | null;
   sectorId: string | null;
-  jornadaId: string | null;
-  sector: { nombre: string; empresa: { nombre: string } | null } | null;
+  empresa: { nombre: string } | null;
+  sector: { nombre: string } | null;
+}
+
+interface Empresa {
+  id: string;
+  nombre: string;
 }
 
 interface Sector {
   id: string;
   nombre: string;
-}
-
-interface Jornada {
-  id: string;
-  nombre: string;
-  horaInicio: string;
-  horaFin: string;
 }
 
 interface Fichada {
@@ -47,8 +46,12 @@ interface DiaResumen {
   horasExtra50: number;
   horasExtra100: number;
   ausente: boolean;
+  justificada: boolean | null;
+  tipoAusencia: string | null;
   extrasValidadas: boolean;
   horasManual: boolean;
+  tarde: boolean;
+  retiroAnticipado: boolean;
   fichadas: Fichada[];
 }
 
@@ -81,21 +84,20 @@ export default function EmpleadoDetalle() {
     queryKey: ["empleado", id],
     queryFn: async () => (await api.get(`/empleados/${id}`)).data as Empleado,
   });
+  const { data: empresas } = useQuery({
+    queryKey: ["empresas"],
+    queryFn: async () => (await api.get("/empresas")).data as Empresa[],
+    enabled: isAdmin,
+  });
   const { data: sectores } = useQuery({
     queryKey: ["sectores"],
     queryFn: async () => (await api.get("/sectores")).data as Sector[],
     enabled: isAdmin,
   });
-  const { data: jornadas } = useQuery({
-    queryKey: ["jornadas"],
-    queryFn: async () => (await api.get("/jornadas")).data as Jornada[],
-    enabled: isAdmin,
-  });
-
   const { data: dias, isLoading: cargandoDias } = useQuery({
     queryKey: ["asistencia-empleado", id, desde, hasta],
     queryFn: async () => (await api.get(`/asistencia/empleado/${id}?desde=${desde}&hasta=${hasta}`)).data as DiaResumen[],
-    enabled: tab === "fichadas",
+    enabled: tab === "fichadas" || tab === "ausencias",
   });
   const { data: ausencias } = useQuery({
     queryKey: ["ausencias", id],
@@ -128,8 +130,8 @@ export default function EmpleadoDetalle() {
     fechaIngreso: "",
     valorHoraNormal: "",
     horasTeoricasDiarias: "",
+    empresaId: "",
     sectorId: "",
-    jornadaId: "",
   });
   useEffect(() => {
     if (empleado) {
@@ -140,8 +142,8 @@ export default function EmpleadoDetalle() {
         fechaIngreso: empleado.fechaIngreso.slice(0, 10),
         valorHoraNormal: String(empleado.valorHoraNormal),
         horasTeoricasDiarias: String(empleado.horasTeoricasDiarias),
+        empresaId: empleado.empresaId ?? "",
         sectorId: empleado.sectorId ?? "",
-        jornadaId: empleado.jornadaId ?? "",
       });
     }
   }, [empleado]);
@@ -154,7 +156,6 @@ export default function EmpleadoDetalle() {
         valorHoraNormal: Number(form.valorHoraNormal),
         horasTeoricasDiarias: Number(form.horasTeoricasDiarias),
         sectorId: form.sectorId || null,
-        jornadaId: form.jornadaId || null,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["empleado", id] });
@@ -182,7 +183,7 @@ export default function EmpleadoDetalle() {
     },
   });
 
-  // --- nueva ausencia manual ---
+  // --- nueva ausencia manual / edición de una ausencia existente ---
   const [nuevaAusencia, setNuevaAusencia] = useState({
     fechaDesde: "",
     fechaHasta: "",
@@ -190,20 +191,87 @@ export default function EmpleadoDetalle() {
     justificada: true,
     observaciones: "",
   });
+  const [editandoAusenciaId, setEditandoAusenciaId] = useState<string | null>(null);
+  function cancelarEdicionAusencia() {
+    setEditandoAusenciaId(null);
+    setNuevaAusencia({ fechaDesde: "", fechaHasta: "", tipo: "PERMISO_PERSONAL", justificada: true, observaciones: "" });
+  }
   const crearAusencia = useMutation({
-    mutationFn: async () =>
-      api.post("/ausencias", {
+    mutationFn: async () => {
+      const data = {
         employeeId: id,
         fechaDesde: nuevaAusencia.fechaDesde,
         fechaHasta: nuevaAusencia.fechaHasta || nuevaAusencia.fechaDesde,
         tipo: nuevaAusencia.justificada ? nuevaAusencia.tipo : "INJUSTIFICADA",
         justificada: nuevaAusencia.justificada,
         observaciones: nuevaAusencia.observaciones || undefined,
+      };
+      return editandoAusenciaId ? api.put(`/ausencias/${editandoAusenciaId}`, data) : api.post("/ausencias", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ausencias", id] });
+      invalidarAsistenciaRelacionada(queryClient);
+      cancelarEdicionAusencia();
+    },
+  });
+  const eliminarAusencia = useMutation({
+    mutationFn: async (ausenciaId: string) => api.delete(`/ausencias/${ausenciaId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ausencias", id] });
+      invalidarAsistenciaRelacionada(queryClient);
+    },
+  });
+
+  // --- clasificar un día detectado como falta (sin fichada) ---
+  const [faltaEnEdicion, setFaltaEnEdicion] = useState<string | null>(null); // fecha YYYY-MM-DD
+  const [claseFalta, setClaseFalta] = useState({ tipo: "PERMISO_PERSONAL", justificada: true, observaciones: "" });
+  const clasificarFalta = useMutation({
+    mutationFn: async () =>
+      api.post("/ausencias", {
+        employeeId: id,
+        fechaDesde: faltaEnEdicion,
+        fechaHasta: faltaEnEdicion,
+        tipo: claseFalta.justificada ? claseFalta.tipo : "INJUSTIFICADA",
+        justificada: claseFalta.justificada,
+        observaciones: claseFalta.observaciones || undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ausencias", id] });
       invalidarAsistenciaRelacionada(queryClient);
-      setNuevaAusencia({ fechaDesde: "", fechaHasta: "", tipo: "PERMISO_PERSONAL", justificada: true, observaciones: "" });
+      setFaltaEnEdicion(null);
+      setClaseFalta({ tipo: "PERMISO_PERSONAL", justificada: true, observaciones: "" });
+    },
+  });
+
+  // --- cargar / editar / eliminar un período de vacaciones ---
+  const [nuevaVacacion, setNuevaVacacion] = useState({ fechaDesde: "", fechaHasta: "", diasTomados: "" });
+  const [editandoVacacionId, setEditandoVacacionId] = useState<string | null>(null);
+  function cancelarEdicionVacacion() {
+    setEditandoVacacionId(null);
+    setNuevaVacacion({ fechaDesde: "", fechaHasta: "", diasTomados: "" });
+  }
+  const guardarVacacion = useMutation({
+    mutationFn: async () => {
+      const data = {
+        employeeId: id,
+        anioCorrespondiente: vacaciones?.anio ?? new Date().getFullYear(),
+        fechaDesde: nuevaVacacion.fechaDesde,
+        fechaHasta: nuevaVacacion.fechaHasta,
+        diasTomados: Number(nuevaVacacion.diasTomados),
+      };
+      return editandoVacacionId ? api.put(`/vacaciones/${editandoVacacionId}`, data) : api.post("/vacaciones", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vacaciones-balance", id] });
+      invalidarAsistenciaRelacionada(queryClient);
+      cancelarEdicionVacacion();
+    },
+  });
+  const eliminarVacacion = useMutation({
+    mutationFn: async (vacacionId: string) => api.delete(`/vacaciones/${vacacionId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vacaciones-balance", id] });
+      invalidarAsistenciaRelacionada(queryClient);
     },
   });
 
@@ -245,7 +313,7 @@ export default function EmpleadoDetalle() {
         )}
       </div>
       <p className="text-slate-500 mb-4">
-        Legajo {empleado.legajo} · {empleado.sector?.empresa?.nombre ?? "Sin empresa"} · {empleado.sector?.nombre ?? "Sin sector"}
+        Legajo {empleado.legajo} · {empleado.empresa?.nombre ?? "Sin empresa"} · {empleado.sector?.nombre ?? "Sin sector"}
         {empleado.sindicato ? ` · ${empleado.sindicato}` : ""} · $
         {empleado.valorHoraNormal.toLocaleString("es-AR")}/hora · {empleado.horasTeoricasDiarias}hs teóricas/día
       </p>
@@ -318,6 +386,22 @@ export default function EmpleadoDetalle() {
             />
           </div>
           <div>
+            <label className="block text-sm text-slate-600 mb-1">Empresa</label>
+            <select
+              required
+              value={form.empresaId}
+              onChange={(e) => setForm({ ...form, empresaId: e.target.value })}
+              className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
+            >
+              <option value="">Seleccionar...</option>
+              {empresas?.map((emp) => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="block text-sm text-slate-600 mb-1">Sector</label>
             <select
               value={form.sectorId}
@@ -328,21 +412,6 @@ export default function EmpleadoDetalle() {
               {sectores?.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm text-slate-600 mb-1">Jornada</label>
-            <select
-              value={form.jornadaId}
-              onChange={(e) => setForm({ ...form, jornadaId: e.target.value })}
-              className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
-            >
-              <option value="">Sin asignar</option>
-              {jornadas?.map((j) => (
-                <option key={j.id} value={j.id}>
-                  {j.nombre} ({j.horaInicio}-{j.horaFin})
                 </option>
               ))}
             </select>
@@ -424,6 +493,16 @@ export default function EmpleadoDetalle() {
                                 {i < d.fichadas.length - 1 ? "," : ""}
                               </span>
                             ))}
+                            {d.tarde && (
+                              <span className="ml-1 text-[10px] font-medium text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded whitespace-nowrap">
+                                Tardanza
+                              </span>
+                            )}
+                            {d.retiroAnticipado && (
+                              <span className="ml-1 text-[10px] font-medium text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded whitespace-nowrap">
+                                Retiro anticipado
+                              </span>
+                            )}
                           </td>
                           <td className="py-2">
                             {horasTrabajadas.toFixed(1)}
@@ -471,7 +550,9 @@ export default function EmpleadoDetalle() {
 
         {tab === "ausencias" && (
           <div>
-            <h3 className="text-sm font-medium text-slate-700 mb-2">Registrar ausencia / incidencia</h3>
+            <h3 className="text-sm font-medium text-slate-700 mb-2">
+              {editandoAusenciaId ? "Editar ausencia / incidencia" : "Registrar ausencia / incidencia"}
+            </h3>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -546,7 +627,7 @@ export default function EmpleadoDetalle() {
                   rows={2}
                 />
               </div>
-              <div className="col-span-2">
+              <div className="col-span-2 flex gap-2">
                 <button
                   type="submit"
                   disabled={
@@ -555,11 +636,72 @@ export default function EmpleadoDetalle() {
                   }
                   className="bg-primary text-white text-sm px-4 py-2 rounded-md hover:bg-primary-dark disabled:opacity-50"
                 >
-                  {crearAusencia.isPending ? "Guardando..." : "Registrar"}
+                  {crearAusencia.isPending ? "Guardando..." : editandoAusenciaId ? "Guardar cambios" : "Registrar"}
                 </button>
+                {editandoAusenciaId && (
+                  <button type="button" onClick={cancelarEdicionAusencia} className="text-sm text-slate-600 px-4 py-2">
+                    Cancelar edición
+                  </button>
+                )}
               </div>
             </form>
 
+            <h3 className="text-sm font-medium text-slate-700 mb-1">Días sin fichada</h3>
+            <p className="text-xs text-slate-500 mb-3">
+              Días detectados como falta (sin marcación) entre el{" "}
+              {new Date(`${desde}T00:00:00`).toLocaleDateString("es-AR", { timeZone: "UTC" })} y el{" "}
+              {new Date(`${hasta}T00:00:00`).toLocaleDateString("es-AR", { timeZone: "UTC" })} (mismo rango que la pestaña
+              Fichadas), estén o no clasificados todavía.
+            </p>
+            <table className="w-full text-sm mb-6">
+              <thead>
+                <tr className="text-left text-slate-500 border-b">
+                  <th className="pb-2">Fecha</th>
+                  <th className="pb-2">Estado</th>
+                  <th className="pb-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {dias?.filter((d) => d.ausente).length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="py-3 text-center text-slate-400">
+                      Sin faltas en el período.
+                    </td>
+                  </tr>
+                )}
+                {dias
+                  ?.filter((d) => d.ausente)
+                  .map((d) => (
+                    <tr key={d.fecha} className="border-b last:border-0">
+                      <td className="py-2">{new Date(d.fecha).toLocaleDateString("es-AR", { timeZone: "UTC" })}</td>
+                      <td className="py-2">
+                        {d.justificada === null ? (
+                          <span className="text-amber-600">Sin clasificar</span>
+                        ) : d.justificada ? (
+                          <span className="text-primary-dark">Justificada — {labelTipoAusencia(d.tipoAusencia ?? "OTRA")}</span>
+                        ) : (
+                          <span className="text-red-600">Injustificada</span>
+                        )}
+                      </td>
+                      <td className="py-2 text-right">
+                        {d.justificada === null && (
+                          <button
+                            onClick={() => {
+                              setFaltaEnEdicion(d.fecha.slice(0, 10));
+                              setClaseFalta({ tipo: "PERMISO_PERSONAL", justificada: true, observaciones: "" });
+                            }}
+                            className="text-slate-700 underline text-xs"
+                          >
+                            Clasificar
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+
+            <h3 className="text-sm font-medium text-slate-700 mb-2">Ausencias registradas</h3>
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-slate-500 border-b">
@@ -568,6 +710,7 @@ export default function EmpleadoDetalle() {
                   <th className="pb-2">Tipo</th>
                   <th className="pb-2">Justificada</th>
                   <th className="pb-2">Observaciones</th>
+                  <th className="pb-2"></th>
                 </tr>
               </thead>
               <tbody>
@@ -578,6 +721,37 @@ export default function EmpleadoDetalle() {
                     <td className="py-2">{labelTipoAusencia(a.tipo)}</td>
                     <td className="py-2">{a.justificada ? "Sí" : "No"}</td>
                     <td className="py-2">{a.observaciones ?? "-"}</td>
+                    <td className="py-2 text-right">
+                      <button
+                        onClick={() => {
+                          setEditandoAusenciaId(a.id);
+                          setNuevaAusencia({
+                            fechaDesde: a.fechaDesde.slice(0, 10),
+                            fechaHasta: a.fechaHasta.slice(0, 10),
+                            tipo: a.tipo,
+                            justificada: a.justificada,
+                            observaciones: a.observaciones ?? "",
+                          });
+                        }}
+                        className="text-slate-700 underline text-xs"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (
+                            confirm(
+                              `¿Eliminar esta ausencia (${new Date(a.fechaDesde).toLocaleDateString("es-AR", { timeZone: "UTC" })} - ${new Date(a.fechaHasta).toLocaleDateString("es-AR", { timeZone: "UTC" })})? Esta acción no se puede deshacer.`
+                            )
+                          ) {
+                            eliminarAusencia.mutate(a.id);
+                          }
+                        }}
+                        className="text-red-600 underline text-xs ml-3"
+                      >
+                        Eliminar
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -601,12 +775,69 @@ export default function EmpleadoDetalle() {
                 <div className="text-2xl font-semibold text-primary">{vacaciones.restantes}</div>
               </div>
             </div>
+
+            <h3 className="text-sm font-medium text-slate-700 mb-2">
+              {editandoVacacionId ? "Editar período de vacaciones" : "Cargar período tomado"}
+            </h3>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                guardarVacacion.mutate();
+              }}
+              className="flex gap-3 items-end mb-6"
+            >
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Desde</label>
+                <input
+                  type="date"
+                  required
+                  value={nuevaVacacion.fechaDesde}
+                  onChange={(e) => setNuevaVacacion({ ...nuevaVacacion, fechaDesde: e.target.value })}
+                  className="border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Hasta</label>
+                <input
+                  type="date"
+                  required
+                  value={nuevaVacacion.fechaHasta}
+                  onChange={(e) => setNuevaVacacion({ ...nuevaVacacion, fechaHasta: e.target.value })}
+                  className="border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Días</label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  value={nuevaVacacion.diasTomados}
+                  onChange={(e) => setNuevaVacacion({ ...nuevaVacacion, diasTomados: e.target.value })}
+                  className="border border-slate-300 rounded-md px-2 py-1.5 text-sm w-20"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={guardarVacacion.isPending}
+                className="bg-primary text-white text-sm px-4 py-2 rounded-md hover:bg-primary-dark disabled:opacity-50"
+              >
+                {guardarVacacion.isPending ? "Guardando..." : editandoVacacionId ? "Guardar cambios" : "Guardar"}
+              </button>
+              {editandoVacacionId && (
+                <button type="button" onClick={cancelarEdicionVacacion} className="text-sm text-slate-600 px-2 py-2">
+                  Cancelar edición
+                </button>
+              )}
+            </form>
+
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-slate-500 border-b">
                   <th className="pb-2">Desde</th>
                   <th className="pb-2">Hasta</th>
                   <th className="pb-2">Días</th>
+                  <th className="pb-2"></th>
                 </tr>
               </thead>
               <tbody>
@@ -615,6 +846,35 @@ export default function EmpleadoDetalle() {
                     <td className="py-2">{new Date(p.fechaDesde).toLocaleDateString("es-AR", { timeZone: "UTC" })}</td>
                     <td className="py-2">{new Date(p.fechaHasta).toLocaleDateString("es-AR", { timeZone: "UTC" })}</td>
                     <td className="py-2">{p.diasTomados}</td>
+                    <td className="py-2 text-right">
+                      <button
+                        onClick={() => {
+                          setEditandoVacacionId(p.id);
+                          setNuevaVacacion({
+                            fechaDesde: p.fechaDesde.slice(0, 10),
+                            fechaHasta: p.fechaHasta.slice(0, 10),
+                            diasTomados: String(p.diasTomados),
+                          });
+                        }}
+                        className="text-slate-700 underline text-xs"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (
+                            confirm(
+                              `¿Eliminar este período de vacaciones (${new Date(p.fechaDesde).toLocaleDateString("es-AR", { timeZone: "UTC" })} - ${new Date(p.fechaHasta).toLocaleDateString("es-AR", { timeZone: "UTC" })})? Esta acción no se puede deshacer.`
+                            )
+                          ) {
+                            eliminarVacacion.mutate(p.id);
+                          }
+                        }}
+                        className="text-red-600 underline text-xs ml-3"
+                      >
+                        Eliminar
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -657,6 +917,79 @@ export default function EmpleadoDetalle() {
           onClose={() => setDiaEnEdicion(null)}
           onSaved={() => invalidarAsistenciaRelacionada(queryClient)}
         />
+      )}
+
+      {faltaEnEdicion && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setFaltaEnEdicion(null)}>
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-medium text-slate-800 mb-1">Clasificar falta</h3>
+            <p className="text-sm text-slate-500 mb-4">
+              {empleado.apellido}, {empleado.nombre} ·{" "}
+              {new Date(`${faltaEnEdicion}T00:00:00`).toLocaleDateString("es-AR", { timeZone: "UTC" })}
+            </p>
+            <label className="block text-xs text-slate-500 mb-1">¿La falta está justificada?</label>
+            <div className="flex gap-2 mb-3">
+              <button
+                onClick={() => setClaseFalta({ ...claseFalta, justificada: true })}
+                className={`flex-1 py-1.5 rounded-md text-sm ${
+                  claseFalta.justificada ? "bg-primary text-white" : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                Justificada
+              </button>
+              <button
+                onClick={() => setClaseFalta({ ...claseFalta, justificada: false })}
+                className={`flex-1 py-1.5 rounded-md text-sm ${
+                  !claseFalta.justificada ? "bg-red-600 text-white" : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                Injustificada
+              </button>
+            </div>
+            {claseFalta.justificada && (
+              <div className="mb-3">
+                <label className="block text-xs text-slate-500 mb-1">Motivo</label>
+                <select
+                  value={claseFalta.tipo}
+                  onChange={(e) => setClaseFalta({ ...claseFalta, tipo: e.target.value })}
+                  className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+                >
+                  {TIPOS_AUSENCIA.filter(([v]) => v !== "INJUSTIFICADA").map(([v, l]) => (
+                    <option key={v} value={v}>
+                      {l}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="mb-4">
+              <label className="block text-xs text-slate-500 mb-1">
+                Observaciones {claseFalta.justificada && claseFalta.tipo === "OTRA" ? "(obligatorio: aclarar el motivo)" : ""}
+              </label>
+              <textarea
+                value={claseFalta.observaciones}
+                onChange={(e) => setClaseFalta({ ...claseFalta, observaciones: e.target.value })}
+                className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+                rows={2}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setFaltaEnEdicion(null)} className="px-4 py-2 text-sm text-slate-600">
+                Cancelar
+              </button>
+              <button
+                onClick={() => clasificarFalta.mutate()}
+                disabled={
+                  (claseFalta.justificada && claseFalta.tipo === "OTRA" && !claseFalta.observaciones.trim()) ||
+                  clasificarFalta.isPending
+                }
+                className="bg-primary text-white text-sm px-4 py-2 rounded-md hover:bg-primary-dark disabled:opacity-50"
+              >
+                {clasificarFalta.isPending ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -14,20 +14,19 @@ interface Empleado {
   valorHoraNormal: number;
   horasTeoricasDiarias: number;
   activo: boolean;
-  sector: { id: string; nombre: string; empresa: { nombre: string } | null } | null;
+  empresa: { id: string; nombre: string } | null;
+  sector: { id: string; nombre: string } | null;
+}
+
+interface Empresa {
+  id: string;
+  nombre: string;
 }
 
 interface Sector {
   id: string;
   nombre: string;
   activo?: boolean;
-}
-
-interface Jornada {
-  id: string;
-  nombre: string;
-  horaInicio: string;
-  horaFin: string;
 }
 
 interface PreviewResult {
@@ -65,17 +64,16 @@ export default function Empleados() {
     queryKey: ["empleados", mostrarInactivos],
     queryFn: async () => (await api.get(`/empleados${mostrarInactivos ? "" : "?activo=true"}`)).data as Empleado[],
   });
+  const { data: empresas } = useQuery({
+    queryKey: ["empresas"],
+    queryFn: async () => (await api.get("/empresas")).data as Empresa[],
+    enabled: isAdmin,
+  });
   const { data: sectores } = useQuery({
     queryKey: ["sectores"],
     queryFn: async () => (await api.get("/sectores")).data as Sector[],
     enabled: isAdmin,
   });
-  const { data: jornadas } = useQuery({
-    queryKey: ["jornadas"],
-    queryFn: async () => (await api.get("/jornadas")).data as Jornada[],
-    enabled: isAdmin,
-  });
-
   const empleadosFiltrados = useMemo(() => {
     if (!empleados) return empleados;
     const q = busqueda.trim().toLowerCase();
@@ -93,8 +91,8 @@ export default function Empleados() {
     fechaIngreso: "",
     valorHoraNormal: "",
     horasTeoricasDiarias: "8",
+    empresaId: "",
     sectorId: "",
-    jornadaId: "",
   });
 
   const crear = useMutation({
@@ -105,7 +103,6 @@ export default function Empleados() {
         valorHoraNormal: Number(form.valorHoraNormal),
         horasTeoricasDiarias: Number(form.horasTeoricasDiarias),
         sectorId: form.sectorId || null,
-        jornadaId: form.jornadaId || null,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["empleados"] });
@@ -118,8 +115,8 @@ export default function Empleados() {
         fechaIngreso: "",
         valorHoraNormal: "",
         horasTeoricasDiarias: "8",
+        empresaId: "",
         sectorId: "",
-        jornadaId: "",
       });
     },
   });
@@ -424,6 +421,22 @@ export default function Empleados() {
             />
           </div>
           <div>
+            <label className="block text-sm text-slate-600 mb-1">Empresa</label>
+            <select
+              required
+              value={form.empresaId}
+              onChange={(e) => setForm({ ...form, empresaId: e.target.value })}
+              className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
+            >
+              <option value="">Seleccionar...</option>
+              {empresas?.map((emp) => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="block text-sm text-slate-600 mb-1">Sector</label>
             <select
               value={form.sectorId}
@@ -434,21 +447,6 @@ export default function Empleados() {
               {sectores?.filter((s) => s.activo !== false).map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm text-slate-600 mb-1">Jornada</label>
-            <select
-              value={form.jornadaId}
-              onChange={(e) => setForm({ ...form, jornadaId: e.target.value })}
-              className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
-            >
-              <option value="">Sin asignar</option>
-              {jornadas?.map((j) => (
-                <option key={j.id} value={j.id}>
-                  {j.nombre} ({j.horaInicio}-{j.horaFin})
                 </option>
               ))}
             </select>
@@ -488,7 +486,7 @@ export default function Empleados() {
                     {!e.activo && <span className="ml-2 text-xs text-red-600">(inactivo)</span>}
                   </td>
                   <td className="py-2">{e.sindicato ?? "-"}</td>
-                  <td className="py-2">{e.sector?.empresa?.nombre ?? "-"}</td>
+                  <td className="py-2">{e.empresa?.nombre ?? "-"}</td>
                   <td className="py-2">{e.sector?.nombre ?? "-"}</td>
                   <td className="py-2">${e.valorHoraNormal.toLocaleString("es-AR")}</td>
                   <td className="py-2">{new Date(e.fechaIngreso).toLocaleDateString("es-AR", { timeZone: "UTC" })}</td>

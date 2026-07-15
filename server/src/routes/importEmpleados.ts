@@ -93,14 +93,8 @@ router.post("/confirm", async (req, res) => {
   const empresas = await prisma.empresa.findMany();
   const empresaByNombre = new Map(empresas.map((e) => [e.nombre.trim().toLowerCase(), e.id]));
   const sectores = await prisma.sector.findMany();
-  // Clave por (empresa, nombre) para desambiguar sectores homónimos en distintas empresas.
-  const sectorByEmpresaNombre = new Map(sectores.map((s) => [`${s.empresaId ?? ""}::${s.nombre.trim().toLowerCase()}`, s.id]));
-  // Fallback: primer sector con ese nombre, para filas que traen sector pero no empresa.
-  const sectorByNombreGlobal = new Map<string, string>();
-  for (const s of sectores) {
-    const k = s.nombre.trim().toLowerCase();
-    if (!sectorByNombreGlobal.has(k)) sectorByNombreGlobal.set(k, s.id);
-  }
+  // Sector es transversal a las empresas: se resuelve solo por nombre.
+  const sectorByNombre = new Map(sectores.map((s) => [s.nombre.trim().toLowerCase(), s.id]));
 
   async function resolverEmpresaId(nombre: string): Promise<string> {
     const key = nombre.toLowerCase();
@@ -111,14 +105,12 @@ router.post("/confirm", async (req, res) => {
     return creada.id;
   }
 
-  async function resolverSectorId(nombre: string, empresaId: string): Promise<string> {
-    const key = `${empresaId}::${nombre.toLowerCase()}`;
-    const existente = sectorByEmpresaNombre.get(key);
+  async function resolverSectorId(nombre: string): Promise<string> {
+    const key = nombre.toLowerCase();
+    const existente = sectorByNombre.get(key);
     if (existente) return existente;
-    const creado = await prisma.sector.create({ data: { nombre, empresaId } });
-    sectorByEmpresaNombre.set(key, creado.id);
-    const gk = nombre.toLowerCase();
-    if (!sectorByNombreGlobal.has(gk)) sectorByNombreGlobal.set(gk, creado.id);
+    const creado = await prisma.sector.create({ data: { nombre } });
+    sectorByNombre.set(key, creado.id);
     return creado.id;
   }
 
@@ -158,17 +150,7 @@ router.post("/confirm", async (req, res) => {
     const sectorNombre = mapping.sector ? String(row[mapping.sector] ?? "").trim() : "";
     const empresaId = empresaNombre ? await resolverEmpresaId(empresaNombre) : null;
     if (sectorNombre) {
-      if (empresaId) {
-        // Empresa + sector: se resuelve (o crea) el sector bajo esa empresa.
-        sectorId = await resolverSectorId(sectorNombre, empresaId);
-      } else {
-        // Sector sin empresa: solo se busca por nombre, no se crea.
-        const match = sectorByNombreGlobal.get(sectorNombre.toLowerCase());
-        if (match) sectorId = match;
-        else errores.push(`Fila ${idx + 2}: sector "${sectorNombre}" no encontrado, se dejó sin asignar`);
-      }
-    } else if (empresaNombre) {
-      errores.push(`Fila ${idx + 2}: empresa "${empresaNombre}" sin sector; el empleado quedó sin sector (la empresa se asigna a través del sector)`);
+      sectorId = await resolverSectorId(sectorNombre);
     }
 
     let horasTeoricasDiarias: number | undefined;
@@ -186,6 +168,7 @@ router.post("/confirm", async (req, res) => {
       sindicato,
       valorHoraNormal,
       fechaIngreso,
+      ...(empresaId ? { empresaId } : {}),
       ...(sectorId ? { sectorId } : {}),
       ...(horasTeoricasDiarias !== undefined ? { horasTeoricasDiarias } : {}),
       ...(fechaNacimiento ? { fechaNacimiento } : {}),
@@ -196,7 +179,11 @@ router.post("/confirm", async (req, res) => {
       await prisma.employee.update({ where: { legajo }, data });
       actualizados += 1;
     } else {
-      await prisma.employee.create({ data: { ...data, legajo } });
+      if (!empresaId) {
+        errores.push(`Fila ${idx + 2}: falta la empresa, es obligatoria para crear un empleado nuevo. Fila no importada.`);
+        continue;
+      }
+      await prisma.employee.create({ data: { ...data, legajo, empresaId } });
       creados += 1;
     }
   }

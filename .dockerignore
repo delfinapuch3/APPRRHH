@@ -1,0 +1,11 @@
+node_modules
+server/node_modules
+web/node_modules
+server/dist
+web/dist
+.git
+.claude
+*.db
+*.db-journal
+.env
+server/.env

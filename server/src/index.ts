@@ -1,6 +1,12 @@
 import "dotenv/config";
+import "express-async-errors";
+import path from "node:path";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
+import { Prisma } from "@prisma/client";
 import cors from "cors";
 import express from "express";
+import type { NextFunction, Request, Response } from "express";
 import authRouter from "./routes/auth.js";
 import empleadosRouter from "./routes/empleados.js";
 import importEmpleadosRouter from "./routes/importEmpleados.js";
@@ -43,6 +49,36 @@ app.use("/api/dashboard", requireAuth, dashboardRouter);
 app.use("/api/usuarios", requireAuth, usuariosRouter);
 app.use("/api/jornadas", requireAuth, jornadasRouter);
 app.use("/api/analitico", requireAuth, analiticoRouter);
+
+// En producción, este mismo servidor sirve el frontend ya compilado
+// (web/dist), para que todo corra como un solo servicio con una sola URL.
+// En desarrollo web/dist no existe (se usa `vite dev` aparte) así que esto
+// no hace nada.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const webDist = path.join(__dirname, "../../web/dist");
+if (fs.existsSync(webDist)) {
+  app.use(express.static(webDist));
+  app.use((req, res, next) => {
+    if (req.path.startsWith("/api/")) return next();
+    res.sendFile(path.join(webDist, "index.html"));
+  });
+}
+
+// Manejador de errores global: sin esto, cualquier error sin capturar en una
+// ruta async (ej. borrar un registro que ya no existe) tumba todo el
+// servidor en vez de responder con un error HTTP normal.
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    if (err.code === "P2025") {
+      return res.status(404).json({ error: "El registro ya no existe (puede que otra persona lo haya borrado)." });
+    }
+    if (err.code === "P2002") {
+      return res.status(409).json({ error: "Ya existe un registro con ese valor." });
+    }
+  }
+  console.error(err);
+  res.status(500).json({ error: "Ocurrió un error inesperado en el servidor." });
+});
 
 const port = process.env.PORT ? Number(process.env.PORT) : 4000;
 app.listen(port, () => {

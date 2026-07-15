@@ -12,7 +12,6 @@ interface Empresa {
 interface Sector {
   id: string;
   nombre: string;
-  empresaId: string | null;
 }
 
 interface ResumenHoy {
@@ -30,6 +29,15 @@ interface TopAusencia {
   ausencias: number;
 }
 
+interface TopTardanza {
+  employeeId: string;
+  legajo: string;
+  nombre: string;
+  tardanzas: number;
+  retirosAnticipados: number;
+  total: number;
+}
+
 interface HorasSector {
   sectorId: string;
   sector: string;
@@ -44,6 +52,39 @@ interface HorasExtraSector {
   horasExtra100: number;
   montoExtra50: number;
   montoExtra100: number;
+}
+
+interface EmpleadoResumen {
+  employeeId: string;
+  legajo: string;
+  nombre: string;
+  sector: string | null;
+}
+
+interface DetalleHoy {
+  presentes: EmpleadoResumen[];
+  ausentes: EmpleadoResumen[];
+  tardes: EmpleadoResumen[];
+  vacaciones: EmpleadoResumen[];
+}
+
+type CategoriaHoy = keyof DetalleHoy;
+
+interface DetalleSectorEmpleado {
+  employeeId: string;
+  legajo: string;
+  nombre: string;
+  horasTrabajadas: number;
+  horasTeoricas: number;
+  horasExtra50: number;
+  horasExtra100: number;
+  montoExtra50: number;
+  montoExtra100: number;
+}
+
+interface DetalleSector {
+  sector: string;
+  empleados: DetalleSectorEmpleado[];
 }
 
 function Gauge({ porcentaje, color }: { porcentaje: number; color: string }) {
@@ -79,6 +120,7 @@ function StatCard({
   bg,
   ring,
   icon,
+  onClick,
 }: {
   titulo: string;
   cantidad: number;
@@ -86,9 +128,13 @@ function StatCard({
   bg: string;
   ring: string;
   icon: React.ReactNode;
+  onClick?: () => void;
 }) {
   return (
-    <div className={`rounded-xl p-5 flex items-center justify-between text-white ${bg}`}>
+    <button
+      onClick={onClick}
+      className={`rounded-xl p-5 flex items-center justify-between text-white text-left w-full transition hover:brightness-110 ${bg}`}
+    >
       <div className="flex items-center gap-4">
         <div className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center">{icon}</div>
         <div>
@@ -97,6 +143,118 @@ function StatCard({
         </div>
       </div>
       <Gauge porcentaje={porcentaje} color={ring} />
+    </button>
+  );
+}
+
+function ModalListaEmpleados({
+  titulo,
+  empleados,
+  onClose,
+}: {
+  titulo: string;
+  empleados: EmpleadoResumen[] | undefined;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-medium text-slate-800">{titulo}</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">
+            &times;
+          </button>
+        </div>
+        {!empleados ? (
+          <p className="text-sm text-slate-500">Cargando...</p>
+        ) : empleados.length === 0 ? (
+          <p className="text-sm text-slate-500">Sin resultados.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-slate-500 border-b">
+                <th className="pb-2">Legajo</th>
+                <th className="pb-2">Nombre</th>
+                <th className="pb-2">Sector</th>
+              </tr>
+            </thead>
+            <tbody>
+              {empleados.map((e) => (
+                <tr key={e.employeeId} className="border-b last:border-0">
+                  <td className="py-2">{e.legajo}</td>
+                  <td className="py-2">
+                    <Link to={`/empleados/${e.employeeId}`} className="text-slate-700 hover:underline" onClick={onClose}>
+                      {e.nombre}
+                    </Link>
+                  </td>
+                  <td className="py-2 text-slate-500">{e.sector ?? "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ModalDetalleSector({
+  titulo,
+  detalle,
+  onClose,
+}: {
+  titulo: string;
+  detalle: DetalleSector | undefined;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-medium text-slate-800">{titulo}</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">
+            &times;
+          </button>
+        </div>
+        {!detalle ? (
+          <p className="text-sm text-slate-500">Cargando...</p>
+        ) : detalle.empleados.length === 0 ? (
+          <p className="text-sm text-slate-500">Sin datos en el período.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-slate-500 border-b">
+                <th className="pb-2">Legajo</th>
+                <th className="pb-2">Nombre</th>
+                <th className="pb-2">Trabajadas</th>
+                <th className="pb-2">Teóricas</th>
+                <th className="pb-2">Extra 50%</th>
+                <th className="pb-2">Extra 100%</th>
+                <th className="pb-2">$ Extra</th>
+              </tr>
+            </thead>
+            <tbody>
+              {detalle.empleados.map((e) => (
+                <tr key={e.employeeId} className="border-b last:border-0">
+                  <td className="py-2">{e.legajo}</td>
+                  <td className="py-2">
+                    <Link to={`/empleados/${e.employeeId}`} className="text-slate-700 hover:underline" onClick={onClose}>
+                      {e.nombre}
+                    </Link>
+                  </td>
+                  <td className="py-2">{e.horasTrabajadas}</td>
+                  <td className="py-2 text-slate-500">{e.horasTeoricas}</td>
+                  <td className="py-2">{e.horasExtra50 || "-"}</td>
+                  <td className="py-2">{e.horasExtra100 || "-"}</td>
+                  <td className="py-2">
+                    {e.montoExtra50 + e.montoExtra100 > 0 ? `$${(e.montoExtra50 + e.montoExtra100).toLocaleString("es-AR")}` : "-"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }
@@ -135,6 +293,8 @@ export default function Dashboard() {
   const [sectorId, setSectorId] = useState("");
   const [periodoHoras, setPeriodoHoras] = useState("mes");
   const [periodoExtra, setPeriodoExtra] = useState("mes");
+  const [categoriaHoy, setCategoriaHoy] = useState<CategoriaHoy | null>(null);
+  const [sectorSeleccionado, setSectorSeleccionado] = useState<{ sectorId: string; periodo: string } | null>(null);
 
   const { data: empresas } = useQuery({
     queryKey: ["empresas"],
@@ -144,7 +304,6 @@ export default function Dashboard() {
     queryKey: ["sectores"],
     queryFn: async () => (await api.get("/sectores")).data as Sector[],
   });
-  const sectoresFiltrados = sectores?.filter((s) => !empresaId || s.empresaId === empresaId);
 
   function buildQS(params: Record<string, string | undefined>) {
     const qs = new URLSearchParams();
@@ -161,6 +320,10 @@ export default function Dashboard() {
     queryKey: ["dashboard-top-ausencias", empresaId, sectorId],
     queryFn: async () => (await api.get(`/dashboard/top-ausencias${buildQS({ empresaId, sectorId })}`)).data as TopAusencia[],
   });
+  const { data: topTardanzas } = useQuery({
+    queryKey: ["dashboard-top-tardanzas", empresaId, sectorId],
+    queryFn: async () => (await api.get(`/dashboard/top-tardanzas${buildQS({ empresaId, sectorId })}`)).data as TopTardanza[],
+  });
   const { data: horasSector } = useQuery({
     queryKey: ["dashboard-horas-sector", empresaId, periodoHoras],
     queryFn: async () => (await api.get(`/dashboard/horas-por-sector${buildQS({ empresaId, periodo: periodoHoras })}`)).data as HorasSector[],
@@ -170,9 +333,32 @@ export default function Dashboard() {
     queryFn: async () =>
       (await api.get(`/dashboard/horas-extra-por-sector${buildQS({ empresaId, periodo: periodoExtra })}`)).data as HorasExtraSector[],
   });
+  const { data: detalleHoy } = useQuery({
+    queryKey: ["dashboard-detalle-hoy", empresaId, sectorId],
+    queryFn: async () => (await api.get(`/dashboard/detalle-hoy${buildQS({ empresaId, sectorId })}`)).data as DetalleHoy,
+    enabled: categoriaHoy !== null,
+  });
+  const { data: detalleSector } = useQuery({
+    queryKey: ["dashboard-detalle-sector", sectorSeleccionado?.sectorId, sectorSeleccionado?.periodo, empresaId],
+    queryFn: async () =>
+      (
+        await api.get(
+          `/dashboard/detalle-sector${buildQS({ sectorId: sectorSeleccionado!.sectorId, periodo: sectorSeleccionado!.periodo, empresaId })}`
+        )
+      ).data as DetalleSector,
+    enabled: sectorSeleccionado !== null,
+  });
+
+  const TITULOS_CATEGORIA: Record<CategoriaHoy, string> = {
+    presentes: "Presentes hoy",
+    ausentes: "Ausentes hoy",
+    tardes: "Tardanzas hoy",
+    vacaciones: "Vacaciones hoy",
+  };
 
   return (
     <div>
+      <style>{`.recharts-bar-rectangle:hover { cursor: pointer; opacity: 0.85; }`}</style>
       <h1 className="page-header mb-1">Hola, {user?.nombre}</h1>
       <p className="text-slate-500 mb-6">Resumen general</p>
 
@@ -181,10 +367,7 @@ export default function Dashboard() {
           <label className="block text-xs text-slate-500 mb-1">Empresa</label>
           <select
             value={empresaId}
-            onChange={(e) => {
-              setEmpresaId(e.target.value);
-              setSectorId("");
-            }}
+            onChange={(e) => setEmpresaId(e.target.value)}
             className="border border-slate-300 rounded-md px-2 py-1.5 text-sm min-w-[160px]"
           >
             <option value="">Todas</option>
@@ -199,7 +382,7 @@ export default function Dashboard() {
           <label className="block text-xs text-slate-500 mb-1">Sector</label>
           <select value={sectorId} onChange={(e) => setSectorId(e.target.value)} className="border border-slate-300 rounded-md px-2 py-1.5 text-sm min-w-[160px]">
             <option value="">Todos</option>
-            {sectoresFiltrados?.map((s) => (
+            {sectores?.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.nombre}
               </option>
@@ -216,6 +399,7 @@ export default function Dashboard() {
           bg="bg-primary"
           ring="#0f5132"
           icon={ICONO_PRESENTE}
+          onClick={() => setCategoriaHoy("presentes")}
         />
         <StatCard
           titulo="Ausentes"
@@ -224,6 +408,7 @@ export default function Dashboard() {
           bg="bg-rose-500"
           ring="#7a1f2b"
           icon={ICONO_AUSENTE}
+          onClick={() => setCategoriaHoy("ausentes")}
         />
         <StatCard
           titulo="Tardes"
@@ -232,44 +417,79 @@ export default function Dashboard() {
           bg="bg-accent"
           ring="#8a5a12"
           icon={ICONO_TARDE}
+          onClick={() => setCategoriaHoy("tardes")}
         />
         <StatCard
           titulo="Vacaciones"
           cantidad={resumen?.vacaciones.cantidad ?? 0}
           porcentaje={resumen?.vacaciones.porcentaje ?? 0}
           bg="bg-violet-400"
+          onClick={() => setCategoriaHoy("vacaciones")}
           ring="#4c2a8f"
           icon={ICONO_VACACIONES}
         />
       </div>
 
-      <div className="card p-5 mb-6">
-        <h2 className="font-medium text-slate-700 mb-3">Top 10 ausencias (mes en curso)</h2>
-        {topAusencias?.length === 0 && <p className="text-sm text-slate-500">Sin ausencias registradas.</p>}
-        {topAusencias && topAusencias.length > 0 && (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-slate-500 border-b">
-                <th className="pb-2">Legajo</th>
-                <th className="pb-2">Nombre</th>
-                <th className="pb-2">Ausencias</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topAusencias.map((a) => (
-                <tr key={a.employeeId} className="border-b last:border-0">
-                  <td className="py-2">{a.legajo}</td>
-                  <td className="py-2">
-                    <Link to={`/empleados/${a.employeeId}`} className="text-slate-700 hover:underline">
-                      {a.nombre}
-                    </Link>
-                  </td>
-                  <td className="py-2 font-medium text-red-600">{a.ausencias}</td>
+      <div className="grid grid-cols-2 gap-6 mb-6">
+        <div className="card p-5">
+          <h2 className="font-medium text-slate-700 mb-3">Top 10 ausencias (mes en curso)</h2>
+          {topAusencias?.length === 0 && <p className="text-sm text-slate-500">Sin ausencias registradas.</p>}
+          {topAusencias && topAusencias.length > 0 && (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-slate-500 border-b">
+                  <th className="pb-2">Legajo</th>
+                  <th className="pb-2">Nombre</th>
+                  <th className="pb-2">Ausencias</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody>
+                {topAusencias.map((a) => (
+                  <tr key={a.employeeId} className="border-b last:border-0">
+                    <td className="py-2">{a.legajo}</td>
+                    <td className="py-2">
+                      <Link to={`/empleados/${a.employeeId}`} className="text-slate-700 hover:underline">
+                        {a.nombre}
+                      </Link>
+                    </td>
+                    <td className="py-2 font-medium text-red-600">{a.ausencias}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="card p-5">
+          <h2 className="font-medium text-slate-700 mb-3">Top 10 llegadas tarde / salidas tempranas (mes en curso)</h2>
+          {topTardanzas?.length === 0 && <p className="text-sm text-slate-500">Sin tardanzas ni retiros anticipados registrados.</p>}
+          {topTardanzas && topTardanzas.length > 0 && (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-slate-500 border-b">
+                  <th className="pb-2">Legajo</th>
+                  <th className="pb-2">Nombre</th>
+                  <th className="pb-2">Tarde</th>
+                  <th className="pb-2">Retiro ant.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topTardanzas.map((t) => (
+                  <tr key={t.employeeId} className="border-b last:border-0">
+                    <td className="py-2">{t.legajo}</td>
+                    <td className="py-2">
+                      <Link to={`/empleados/${t.employeeId}`} className="text-slate-700 hover:underline">
+                        {t.nombre}
+                      </Link>
+                    </td>
+                    <td className="py-2 font-medium text-amber-600">{t.tardanzas || "-"}</td>
+                    <td className="py-2 font-medium text-orange-600">{t.retirosAnticipados || "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-6">
@@ -295,8 +515,18 @@ export default function Dashboard() {
               <YAxis tick={{ fontSize: 12 }} />
               <Tooltip />
               <Legend />
-              <Bar dataKey="horasTrabajadas" name="Trabajadas" fill="#0ea5e9" />
-              <Bar dataKey="horasTeoricas" name="Teóricas" fill="#94a3b8" />
+              <Bar
+                dataKey="horasTrabajadas"
+                name="Trabajadas"
+                fill="#0ea5e9"
+                onClick={(data) => setSectorSeleccionado({ sectorId: data.payload.sectorId, periodo: periodoHoras })}
+              />
+              <Bar
+                dataKey="horasTeoricas"
+                name="Teóricas"
+                fill="#94a3b8"
+                onClick={(data) => setSectorSeleccionado({ sectorId: data.payload.sectorId, periodo: periodoHoras })}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -323,8 +553,18 @@ export default function Dashboard() {
               <YAxis tick={{ fontSize: 12 }} />
               <Tooltip />
               <Legend />
-              <Bar dataKey="horasExtra50" name="Extra 50%" fill="#f59e0b" />
-              <Bar dataKey="horasExtra100" name="Extra 100%" fill="#ef4444" />
+              <Bar
+                dataKey="horasExtra50"
+                name="Extra 50%"
+                fill="#f59e0b"
+                onClick={(data) => setSectorSeleccionado({ sectorId: data.payload.sectorId, periodo: periodoExtra })}
+              />
+              <Bar
+                dataKey="horasExtra100"
+                name="Extra 100%"
+                fill="#ef4444"
+                onClick={(data) => setSectorSeleccionado({ sectorId: data.payload.sectorId, periodo: periodoExtra })}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -352,11 +592,36 @@ export default function Dashboard() {
             <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `$${Number(v).toLocaleString("es-AR")}`} />
             <Tooltip formatter={(v) => `$${Number(v).toLocaleString("es-AR")}`} />
             <Legend />
-            <Bar dataKey="montoExtra50" name="Extra 50%" fill="#f59e0b" />
-            <Bar dataKey="montoExtra100" name="Extra 100%" fill="#ef4444" />
+            <Bar
+              dataKey="montoExtra50"
+              name="Extra 50%"
+              fill="#f59e0b"
+              onClick={(data) => setSectorSeleccionado({ sectorId: data.payload.sectorId, periodo: periodoExtra })}
+            />
+            <Bar
+              dataKey="montoExtra100"
+              name="Extra 100%"
+              fill="#ef4444"
+              onClick={(data) => setSectorSeleccionado({ sectorId: data.payload.sectorId, periodo: periodoExtra })}
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>
+
+      {categoriaHoy && (
+        <ModalListaEmpleados
+          titulo={TITULOS_CATEGORIA[categoriaHoy]}
+          empleados={detalleHoy?.[categoriaHoy]}
+          onClose={() => setCategoriaHoy(null)}
+        />
+      )}
+      {sectorSeleccionado && (
+        <ModalDetalleSector
+          titulo={detalleSector?.sector ?? sectores?.find((s) => s.id === sectorSeleccionado.sectorId)?.nombre ?? ""}
+          detalle={detalleSector}
+          onClose={() => setSectorSeleccionado(null)}
+        />
+      )}
     </div>
   );
 }

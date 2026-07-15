@@ -77,20 +77,23 @@ model User {
 }
 
 model Empresa {
-  id        String   @id @default(cuid())
-  nombre    String   @unique
-  activo    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  sectores  Sector[]
+  id        String     @id @default(cuid())
+  nombre    String     @unique
+  activo    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  empleados Employee[]
 }
 
+/**
+ * Sector es transversal a las empresas: agrupa empleados por función (ej.
+ * "Calidad") sin importar si son de Polcecal o Polysan. La empresa de cada
+ * empleado se guarda directamente en Employee.empresaId.
+ */
 model Sector {
   id         String       @id @default(cuid())
-  nombre     String
+  nombre     String       @unique
   activo     Boolean      @default(true)
   createdAt  DateTime     @default(now())
-  empresaId  String?
-  empresa    Empresa?     @relation(fields: [empresaId], references: [id])
   empleados  Employee[]
   encargados UserSector[]
 }
@@ -116,14 +119,14 @@ model Employee {
   fechaIngreso             DateTime
   valorHoraNormal          Float
   horasTeoricasDiarias     Float    @default(8)
+  empresaId                String
   sectorId                 String?
-  jornadaId                String?
   activo                   Boolean  @default(true)
   escalaVacacionesOverride String?
   createdAt                DateTime @default(now())
 
+  empresa           Empresa             @relation(fields: [empresaId], references: [id])
   sector            Sector?             @relation(fields: [sectorId], references: [id])
-  jornada           Jornada?            @relation(fields: [jornadaId], references: [id])
   fichadas          TimeRecord[]
   calculosDiarios   DailyCalculation[]
   ausencias         Absence[]
@@ -133,24 +136,23 @@ model Employee {
 }
 
 /**
- * Jornada: plantilla de horario (oficina 8 a 16, turnos rotativos 4-12/12-20/
- * 20-4, etc.) que se le asigna a un operario. redondeoMinutos redondea el
- * total de horas trabajadas del día al incremento más cercano (ej. 60 =
- * redondear a la hora más cercana, así 7.9hs queda en 8hs). toleranciaMinutos
- * es la ventana de gracia sobre horaInicio antes de marcar el día como
- * tardanza.
+ * Turno (modelo Jornada): plantilla horaria del catálogo global (ej. "Turno
+ * mañana" 6-14, "Turno tarde" 14-22, "Turno noche" 22-6, o una jornada de
+ * oficina 8-16). No se asigna fijo a un empleado: cada día, el motor de
+ * cálculo detecta automáticamente cuál de estos turnos activos es el más
+ * cercano a la marcación real y lo usa para esa jornada. toleranciaMinutos es
+ * el margen (en minutos, aplicado tanto a la entrada como a la salida) dentro
+ * del cual se redondea a la hora exacta del turno sin marcar tardanza ni
+ * generar hora extra.
  */
 model Jornada {
   id                String   @id @default(cuid())
   nombre            String
   horaInicio        String
   horaFin           String
-  redondeoMinutos   Int      @default(0)
-  toleranciaMinutos Int      @default(0)
+  toleranciaMinutos Int      @default(15)
   activo            Boolean  @default(true)
   createdAt         DateTime @default(now())
-
-  empleados Employee[]
 }
 
 model TimeRecord {
@@ -219,6 +221,7 @@ model DailyCalculation {
   fechaValidacion DateTime?
   horasManual     Boolean       @default(false)
   tarde           Boolean       @default(false)
+  retiroAnticipado Boolean      @default(false)
   updatedAt       DateTime      @updatedAt
 
   employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)

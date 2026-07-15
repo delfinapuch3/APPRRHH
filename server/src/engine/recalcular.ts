@@ -1,7 +1,7 @@
 import { prisma } from "../db.js";
 import { calcularDia, type PayrollConfigLike, type TimeInterval } from "./calculo.js";
 import { addUtcDays, dayOfWeekUtc, localDateTime, utcDateOnlyFrom } from "../lib/dates.js";
-import { SECTOR_LUNES_A_VIERNES } from "../lib/constants.js";
+import { SECTORES_LUNES_A_VIERNES } from "../lib/constants.js";
 
 const startOfDay = utcDateOnlyFrom;
 
@@ -29,6 +29,115 @@ interface FichadaLike {
   fecha: Date;
   horaEntrada: Date;
   horaSalida: Date | null;
+}
+
+interface TurnoLike {
+  id: string;
+  horaInicio: string;
+  horaFin: string;
+  toleranciaMinutos: number;
+}
+
+function parseHora(hhmm: string): { h: number; m: number; min: number } {
+  const [h, m] = hhmm.split(":").map(Number);
+  return { h, m, min: h * 60 + m };
+}
+
+function distanciaCircular(aMin: number, bMin: number): number {
+  const diff = Math.abs(aMin - bMin) % 1440;
+  return Math.min(diff, 1440 - diff);
+}
+
+/**
+ * El turno del catálogo más parecido a la marcación real: compara tanto la
+ * entrada (contra horaInicio) como la salida (contra horaFin, si ya se
+ * conoce) para no confundir turnos que arrancan a la misma hora pero duran
+ * distinto (ej. "Oficina" 08-16 vs "Turno pasante" 08-12 con la misma
+ * entrada 08:00 pero salidas muy distintas).
+ */
+function detectarTurno(entradaMin: number, salidaMin: number | null, turnos: TurnoLike[]): TurnoLike | null {
+  if (turnos.length === 0) return null;
+  const distancia = (t: TurnoLike): number => {
+    const dEntrada = distanciaCircular(entradaMin, parseHora(t.horaInicio).min);
+    if (salidaMin === null) return dEntrada;
+    return dEntrada + distanciaCircular(salidaMin, parseHora(t.horaFin).min);
+  };
+  return turnos.reduce((mejor, t) => (distancia(t) < distancia(mejor) ? t : mejor));
+}
+
+/** Instantes reales (horario pactado) de inicio/fin del turno para el día calendario `dia`, resolviendo turnos que cruzan medianoche (ej. 22-06). */
+function anclaTurno(dia: Date, turno: TurnoLike): { inicio: Date; fin: Date } {
+  const ini = parseHora(turno.horaInicio);
+  const fin = parseHora(turno.horaFin);
+  const inicio = localDateTime(dia, ini.h, ini.m);
+  const finDate = fin.min <= ini.min ? localDateTime(addUtcDays(dia, 1), fin.h, fin.m) : localDateTime(dia, fin.h, fin.m);
+  return { inicio, fin: finDate };
+}
+
+/**
+ * Ajusta las fichadas de cada día calendario según el turno del catálogo más
+ * cercano a la entrada real. El margen (toleranciaMinutos) es una gracia
+ * única de hasta esos minutos, para llegar tarde o para irse antes: dentro
+ * del margen se redondea a la hora exacta del turno; pasado el margen, se
+ * cuenta el horario real (se pierden esos minutos de las horas normales) y
+ * además se marca tardanza o retiro anticipado según corresponda. Si se
+ * queda trabajando más de toleranciaMinutos después del fin de turno, ese
+ * tiempo de más se acredita igual (queda como hora extra sujeta a
+ * validación de RRHH). Si no hay ningún turno activo en el catálogo, no se
+ * ajusta nada (se sigue usando la marcación real tal cual, como antes de
+ * tener turnos).
+ */
+export function ajustarFichadasPorTurno(
+  fichadas: FichadaLike[],
+  turnos: TurnoLike[]
+): { ajustadas: FichadaLike[]; tardePorDia: Map<number, boolean>; retiroAnticipadoPorDia: Map<number, boolean> } {
+  const tardePorDia = new Map<number, boolean>();
+  const retiroAnticipadoPorDia = new Map<number, boolean>();
+  if (turnos.length === 0) return { ajustadas: fichadas, tardePorDia, retiroAnticipadoPorDia };
+
+  const grupos = new Map<number, FichadaLike[]>();
+  for (const f of fichadas) {
+    const key = startOfDay(f.fecha).getTime();
+    const arr = grupos.get(key) ?? [];
+    arr.push(f);
+    grupos.set(key, arr);
+  }
+
+  const ajustadas: FichadaLike[] = [];
+  for (const [key, grupoSinOrdenar] of grupos) {
+    const grupo = [...grupoSinOrdenar].sort((a, b) => a.horaEntrada.getTime() - b.horaEntrada.getTime());
+    const diaGrupo = startOfDay(grupo[0].fecha);
+    const primeraEntrada = grupo[0].horaEntrada;
+    const entradaMin = primeraEntrada.getHours() * 60 + primeraEntrada.getMinutes();
+    const ultimaSalidaRaw = grupo[grupo.length - 1].horaSalida;
+    const salidaMin = ultimaSalidaRaw ? ultimaSalidaRaw.getHours() * 60 + ultimaSalidaRaw.getMinutes() : null;
+    const turno = detectarTurno(entradaMin, salidaMin, turnos);
+    if (!turno) {
+      ajustadas.push(...grupo);
+      continue;
+    }
+    const { inicio: anchorInicio, fin: anchorFin } = anclaTurno(diaGrupo, turno);
+    const desvioEntrada = (primeraEntrada.getTime() - anchorInicio.getTime()) / 60_000;
+    const tarde = desvioEntrada > turno.toleranciaMinutos;
+    tardePorDia.set(key, tarde);
+
+    grupo.forEach((f, i) => {
+      const esPrimera = i === 0;
+      const esUltima = i === grupo.length - 1;
+      // Dentro del margen (incluida la llegada temprana) se acredita desde el
+      // horario pactado; pasado el margen de tardanza, se pierde ese tiempo
+      // real (se acredita desde que fichó, no desde el horario del turno).
+      const horaEntrada = esPrimera ? (tarde ? f.horaEntrada : anchorInicio) : f.horaEntrada;
+      let horaSalida = f.horaSalida;
+      if (esUltima && f.horaSalida) {
+        const desvioSalida = (f.horaSalida.getTime() - anchorFin.getTime()) / 60_000;
+        horaSalida = Math.abs(desvioSalida) > turno.toleranciaMinutos ? f.horaSalida : anchorFin;
+        retiroAnticipadoPorDia.set(key, desvioSalida < -turno.toleranciaMinutos);
+      }
+      ajustadas.push({ fecha: f.fecha, horaEntrada, horaSalida });
+    });
+  }
+  return { ajustadas, tardePorDia, retiroAnticipadoPorDia };
 }
 
 /**
@@ -70,13 +179,10 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
 
   // Se trae un día extra hacia atrás para poder partir correctamente los
   // turnos que arrancaron el día anterior al rango pedido y cruzan medianoche.
-  const [empleado, fichadas, ausencias, vacaciones, feriados] = await Promise.all([
+  const [empleado, fichadas, ausencias, vacaciones, feriados, turnosActivos] = await Promise.all([
     prisma.employee.findUnique({
       where: { id: employeeId },
-      select: {
-        sector: { select: { nombre: true } },
-        jornada: { select: { horaInicio: true, redondeoMinutos: true, toleranciaMinutos: true } },
-      },
+      select: { sector: { select: { nombre: true } } },
     }),
     prisma.timeRecord.findMany({
       where: { employeeId, fecha: { gte: addUtcDays(startOfDay(desde), -1), lte: startOfDay(hasta) } },
@@ -90,9 +196,14 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
     prisma.holiday.findMany({
       where: { fecha: { gte: startOfDay(desde), lte: startOfDay(hasta) } },
     }),
+    prisma.jornada.findMany({
+      where: { activo: true },
+      select: { id: true, horaInicio: true, horaFin: true, toleranciaMinutos: true },
+    }),
   ]);
-  const trabajaLunesAViernesNomas = empleado?.sector?.nombre === SECTOR_LUNES_A_VIERNES;
-  const jornada = empleado?.jornada ?? null;
+  const trabajaLunesAViernesNomas = !!empleado?.sector?.nombre && SECTORES_LUNES_A_VIERNES.includes(empleado.sector.nombre);
+
+  const { ajustadas: fichadasAjustadas, tardePorDia, retiroAnticipadoPorDia } = ajustarFichadasPorTurno(fichadas, turnosActivos);
 
   const feriadosSet = new Set(feriados.map((f) => startOfDay(f.fecha).getTime()));
 
@@ -114,14 +225,15 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
     tipoAusencia: string | null;
     observaciones: string | null;
     tarde: boolean;
+    retiroAnticipado: boolean;
   }[] = [];
 
   for (const dia of dias) {
     const key = dia.getTime();
-    const intervals = intervalsParaDia(dia, fichadas);
+    const intervals = intervalsParaDia(dia, fichadasAjustadas);
 
     const esFeriado = feriadosSet.has(key);
-    const calc = calcularDia(dia, intervals, esFeriado, config, jornada?.redondeoMinutos ?? 0);
+    const calc = calcularDia(dia, intervals, esFeriado, config);
 
     const dow = dayOfWeekUtc(dia);
     const esDomingoLibre = dow === 0; // domingo es franco semanal, no cuenta como ausencia si no trabajó
@@ -133,19 +245,11 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
     const tieneFichada = fichadasDelDia.length > 0;
     const tieneFichadaAbierta = fichadasDelDia.some((f) => !f.horaSalida);
 
-    // Tardanza: la jornada asignada define la hora de entrada esperada; si la
-    // primera marcación del día llega después de esa hora + el margen de
-    // tolerancia, se marca el día como tarde.
-    let tarde = false;
-    if (jornada && tieneFichada && !esDomingoLibre && !esSabadoNoLaboral) {
-      const primeraEntrada = fichadasDelDia.reduce(
-        (min, f) => (f.horaEntrada < min ? f.horaEntrada : min),
-        fichadasDelDia[0].horaEntrada
-      );
-      const [h, m] = jornada.horaInicio.split(":").map(Number);
-      const limite = new Date(localDateTime(dia, h, m).getTime() + jornada.toleranciaMinutos * 60_000);
-      tarde = primeraEntrada > limite;
-    }
+    // Tardanza: se detecta comparando la primera marcación del día contra el
+    // horario pactado del turno más cercano (ver ajustarFichadasPorTurno).
+    const tarde = tieneFichada && !esDomingoLibre && !esSabadoNoLaboral ? tardePorDia.get(key) ?? false : false;
+    const retiroAnticipado =
+      tieneFichada && !esDomingoLibre && !esSabadoNoLaboral ? retiroAnticipadoPorDia.get(key) ?? false : false;
 
     const vacacion = vacaciones.find((v) => startOfDay(v.fechaDesde) <= dia && startOfDay(v.fechaHasta) >= dia);
     const ausenciaCargada = ausencias.find(
@@ -164,6 +268,8 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
         ausente = true;
         justificada = ausenciaCargada.justificada;
         tipoAusencia = ausenciaCargada.tipo;
+      } else if (esFeriado) {
+        ausente = false; // feriado no laborable: no cuenta como falta si no hay licencia cargada
       } else {
         ausente = true;
         justificada = null; // sin clasificar todavía
@@ -185,6 +291,7 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
       tipoAusencia,
       observaciones,
       tarde,
+      retiroAnticipado,
     });
   }
 
@@ -215,6 +322,7 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
           tipoAusencia: r.tipoAusencia as never,
           observaciones: r.observaciones,
           tarde: r.tarde,
+          retiroAnticipado: r.retiroAnticipado,
           ...resetValidacion,
         },
         create: {
@@ -225,6 +333,7 @@ export async function recalcularEmpleadoPeriodo(employeeId: string, desde: Date,
           horasExtra50: r.horasExtra50,
           horasExtra100: r.horasExtra100,
           tarde: r.tarde,
+          retiroAnticipado: r.retiroAnticipado,
           francoGenerado: r.francoGenerado,
           ausente: r.ausente,
           justificada: r.justificada,

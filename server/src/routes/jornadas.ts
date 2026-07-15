@@ -15,7 +15,6 @@ const jornadaSchema = z.object({
   nombre: z.string().min(1),
   horaInicio: z.string().regex(horaRegex),
   horaFin: z.string().regex(horaRegex),
-  redondeoMinutos: z.number().int().min(0).max(60),
   toleranciaMinutos: z.number().int().min(0).max(120),
   activo: z.boolean().optional(),
 });
@@ -35,10 +34,6 @@ router.put("/:id", requireAdmin, async (req, res) => {
 });
 
 router.delete("/:id", requireAdmin, async (req, res) => {
-  const enUso = await prisma.employee.count({ where: { jornadaId: req.params.id } });
-  if (enUso > 0) {
-    return res.status(400).json({ error: `No se puede eliminar: ${enUso} empleado(s) tienen esta jornada asignada.` });
-  }
   await prisma.jornada.delete({ where: { id: req.params.id } });
   res.status(204).end();
 });

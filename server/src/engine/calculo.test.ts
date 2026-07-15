@@ -94,26 +94,10 @@ describe("calcularDia", () => {
     expect(r.francoGenerado).toBe(false);
   });
 
-  it("redondeoMinutos=60 redondea 7.9hs a 8hs (día hábil)", () => {
-    const fecha = d(2026, 7, 6, 0, 0);
-    const r = calcularDia(fecha, [{ start: d(2026, 7, 6, 8), end: d(2026, 7, 6, 15, 54) }], false, config, 60);
-    expect(r.horasNormales).toBe(8);
-    expect(r.horasExtra50).toBe(0);
-  });
-
-  it("sin redondeoMinutos (default) no toca las horas fraccionarias", () => {
+  it("horas fraccionarias no se tocan (el redondeo ahora se aplica antes, según el turno detectado)", () => {
     const fecha = d(2026, 7, 6, 0, 0);
     const r = calcularDia(fecha, [{ start: d(2026, 7, 6, 8), end: d(2026, 7, 6, 15, 54) }], false, config);
     expect(r.horasNormales).toBeCloseTo(7.9, 5);
-  });
-
-  it("redondeoMinutos aplica a las dos mitades de un sábado por separado", () => {
-    // 10h antes del corte (02:00-12:00) + 1h06 después (12:00-13:06) -> redondeado a 60min: 10 y 1
-    const fecha = d(2026, 7, 11, 0, 0);
-    const r = calcularDia(fecha, [{ start: d(2026, 7, 11, 2), end: d(2026, 7, 11, 13, 6) }], false, config, 60);
-    expect(r.horasNormales).toBe(8);
-    expect(r.horasExtra50).toBe(2);
-    expect(r.horasExtra100).toBe(1);
   });
 
   it("múltiples intervalos el mismo día (entrada/salida por almuerzo) se suman", () => {

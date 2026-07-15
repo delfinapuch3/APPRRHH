@@ -3,7 +3,7 @@ import { prisma } from "../db.js";
 import { sectorScope } from "../middleware/auth.js";
 import { recalcularSectorPeriodo } from "../engine/recalcular.js";
 import { utcDateOnlyFrom } from "../lib/dates.js";
-import { SECTOR_LUNES_A_VIERNES } from "../lib/constants.js";
+import { SECTORES_LUNES_A_VIERNES } from "../lib/constants.js";
 
 const router = Router();
 
@@ -51,7 +51,7 @@ router.get("/resumen", async (req, res) => {
   let diasAusentes = 0;
   for (const c of calculos) {
     const emp = empleadoById.get(c.employeeId);
-    const trabajaLunesAViernesNomas = emp?.sector?.nombre === SECTOR_LUNES_A_VIERNES;
+    const trabajaLunesAViernesNomas = !!emp?.sector?.nombre && SECTORES_LUNES_A_VIERNES.includes(emp.sector.nombre);
     if (esDiaEsperado(c.tipoDia, trabajaLunesAViernesNomas)) {
       diasEsperados += 1;
       if (c.ausente) diasAusentes += 1;
@@ -113,7 +113,7 @@ router.get("/ausentismo-por-mes", async (req, res) => {
     let ausentes = 0;
     for (const c of calculos) {
       const emp = empleadoById.get(c.employeeId);
-      const trabajaLunesAViernesNomas = emp?.sector?.nombre === SECTOR_LUNES_A_VIERNES;
+      const trabajaLunesAViernesNomas = !!emp?.sector?.nombre && SECTORES_LUNES_A_VIERNES.includes(emp.sector.nombre);
       if (esDiaEsperado(c.tipoDia, trabajaLunesAViernesNomas)) {
         esperados += 1;
         if (c.ausente) ausentes += 1;
@@ -166,11 +166,11 @@ router.get("/por-empresa", async (req, res) => {
   const scope = sectorScope(req);
   const empleados = await prisma.employee.findMany({
     where: { activo: true, ...(scope ? { sectorId: { in: scope } } : {}) },
-    select: { sector: { select: { empresa: { select: { nombre: true } } } } },
+    select: { empresa: { select: { nombre: true } } },
   });
   const conteo = new Map<string, number>();
   for (const e of empleados) {
-    const clave = e.sector?.empresa?.nombre ?? "Sin empresa";
+    const clave = e.empresa?.nombre ?? "Sin empresa";
     conteo.set(clave, (conteo.get(clave) ?? 0) + 1);
   }
   res.json([...conteo.entries()].map(([empresa, cantidad]) => ({ empresa, cantidad })));

@@ -47,7 +47,11 @@ El importador soporta el formato con columna "Marcaciones" combinada (ej. `E 08:
 
 ## Empresas y sectores
 
-Los empleados se agrupan por Empresa (ej. POLCECAL, POLYSAN) y Sector (ej. Francisco, Administración) — se gestionan desde Configuración. Los encargados de sector solo ven y operan sobre los empleados de sus sectores asignados.
+Cada empleado pertenece a una Empresa (ej. POLCECAL, POLYSAN) y opcionalmente a un Sector (ej. Calidad, Mantenimiento) — ambos se gestionan desde Configuración. Los sectores son transversales a las empresas: agrupan empleados de todas las empresas por función, no por a quién le pagan el sueldo. Los sectores administrativos (Administración, Calidad, Compras y Pañol, Finanzas, RRHH, Tesorería, Ventas y Despacho — ver `SECTORES_LUNES_A_VIERNES` en `server/src/lib/constants.ts`) no trabajan fines de semana, así que un sábado/domingo sin fichada no cuenta como falta para esos sectores. Los encargados de sector solo ven y operan sobre los empleados de sus sectores asignados.
+
+## Turnos, tardanza y horas extra por retiro anticipado/tardanza
+
+En Administración → Turnos se carga el catálogo de turnos posibles (ej. Mañana 06-14, Tarde 14-22, Noche 22-06). No se asignan a cada empleado: cada día, el sistema detecta automáticamente cuál es el turno más parecido a la marcación real (comparando entrada y salida). El margen configurado por turno (default 15 min) es una gracia única: un desvío de hasta ese margen, al llegar o al salir, redondea a la hora exacta del turno; pasado el margen se pierde ese tiempo real y además se marca **tardanza** (llegada tarde) o **retiro anticipado** (salida temprana). Quedarse trabajando más del margen después del fin de turno se acredita como hora extra, sujeta a validación de RRHH igual que el resto de las horas extra.
 
 ## Validación de horas extra
 
@@ -65,6 +69,22 @@ rm prisma/dev.db
 npx prisma migrate deploy
 npx tsx prisma/seed.ts
 ```
+
+## Deploy a producción
+
+La app corre como un solo servicio: el backend (Express) sirve tanto la API (`/api/*`) como el frontend ya compilado, así que solo hace falta desplegar un servicio con una URL.
+
+```
+npm run build   # compila server (tsc) y web (vite build)
+npm run start   # aplica migraciones pendientes y arranca node server/dist/index.js
+```
+
+Variables de entorno necesarias en producción (no usar los valores de `.env.example`):
+- `DATABASE_URL`: en SQLite, apuntar a un archivo dentro de un **volumen persistente** (ej. `file:/data/dev.db` en Railway) — sin esto, la base se borra en cada redeploy.
+- `JWT_SECRET`: un secreto propio y distinto al de desarrollo.
+- `PORT`: la mayoría de los hosts (Railway incluido) lo asignan automáticamente.
+
+Incluye un `Dockerfile` en la raíz listo para Railway/Render/Fly.io u otro host con soporte Docker. Antes del primer deploy con datos reales, hay que migrar la base local (`server/prisma/dev.db`) al volumen persistente del host — no alcanza con correr el seed, que solo crea usuarios y datos de ejemplo.
 
 ## Notas técnicas
 

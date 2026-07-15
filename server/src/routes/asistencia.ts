@@ -4,7 +4,7 @@ import { prisma } from "../db.js";
 import { sectorScope, requireAdmin } from "../middleware/auth.js";
 import { recalcularSectorPeriodo, recalcularEmpleadoPeriodo } from "../engine/recalcular.js";
 import { dayOfWeekUtc, utcDateOnlyFrom } from "../lib/dates.js";
-import { SECTOR_LUNES_A_VIERNES } from "../lib/constants.js";
+import { SECTORES_LUNES_A_VIERNES } from "../lib/constants.js";
 
 const router = Router();
 
@@ -42,7 +42,7 @@ router.get("/resumen", async (req, res) => {
   });
 
   const porEmpleado = empleados.map((emp) => {
-    const trabajaLunesAViernesNomas = emp.sector?.nombre === SECTOR_LUNES_A_VIERNES;
+    const trabajaLunesAViernesNomas = !!emp.sector?.nombre && SECTORES_LUNES_A_VIERNES.includes(emp.sector.nombre);
     const dias = calculos.filter((c) => c.employeeId === emp.id);
     const diasEsperados = dias.filter(
       (d) => d.tipoDia !== "DOMINGO" && !(trabajaLunesAViernesNomas && d.tipoDia === "SABADO")
@@ -108,7 +108,7 @@ router.get("/dia", async (req, res) => {
     .map((emp) => {
       const c = porEmpleado.get(emp.id);
       const horasTrabajadas = c ? c.horasNormales + c.horasExtra50 + c.horasExtra100 : 0;
-      const trabajaLunesAViernesNomas = emp.sector?.nombre === SECTOR_LUNES_A_VIERNES;
+      const trabajaLunesAViernesNomas = !!emp.sector?.nombre && SECTORES_LUNES_A_VIERNES.includes(emp.sector.nombre);
       const esDiaNoLaboral = dow === 0 || (dow === 6 && trabajaLunesAViernesNomas);
       return {
         employeeId: emp.id,

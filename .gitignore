@@ -4,6 +4,8 @@ dist
 .env
 *.db
 *.db-journal
+*.db.bak*
+.DS_Store
 web/dist
 server/dist
 *.tsbuildinfo

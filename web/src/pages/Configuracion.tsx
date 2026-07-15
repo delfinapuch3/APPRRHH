@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../api/client.js";
+import { api, errorMessage } from "../api/client.js";
 
 interface Config {
   horasNormalesPorDia: number;
@@ -24,8 +24,7 @@ export default function Configuracion() {
   });
   const { data: sectores } = useQuery({
     queryKey: ["sectores"],
-    queryFn: async () =>
-      (await api.get("/sectores")).data as { id: string; nombre: string; activo: boolean; empresa: { nombre: string } | null }[],
+    queryFn: async () => (await api.get("/sectores")).data as { id: string; nombre: string; activo: boolean }[],
   });
 
   const [local, setLocal] = useState<Config | null>(null);
@@ -47,13 +46,16 @@ export default function Configuracion() {
     },
   });
 
-  const [nuevoSector, setNuevoSector] = useState({ nombre: "", empresaId: "" });
+  const [nuevoSector, setNuevoSector] = useState({ nombre: "" });
+  const [errorSector, setErrorSector] = useState<string | null>(null);
   const crearSector = useMutation({
     mutationFn: async () => api.post("/sectores", nuevoSector),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sectores"] });
-      setNuevoSector({ nombre: "", empresaId: "" });
+      setNuevoSector({ nombre: "" });
+      setErrorSector(null);
     },
+    onError: (err) => setErrorSector(errorMessage(err, "No se pudo crear el sector")),
   });
   const toggleSector = useMutation({
     mutationFn: async ({ id, activo }: { id: string; activo: boolean }) => api.put(`/sectores/${id}`, { activo }),
@@ -195,11 +197,14 @@ export default function Configuracion() {
 
         <div className="card p-5">
           <h2 className="font-medium text-slate-700 mb-3">Sectores</h2>
+          <p className="text-xs text-slate-400 mb-2">
+            Un sector agrupa empleados de ambas empresas (ej. "Calidad" incluye a Calidad de Polcecal y de Polysan).
+          </p>
           <ul className="text-sm mb-3 space-y-1">
             {sectores?.map((s) => (
               <li key={s.id} className={`flex items-center justify-between gap-2 ${s.activo ? "text-slate-600" : "text-slate-400"}`}>
                 <span>
-                  {s.nombre} {s.empresa ? `(${s.empresa.nombre})` : ""}
+                  {s.nombre}
                   {!s.activo && <span className="ml-1 text-xs">· inactivo</span>}
                 </span>
                 <button
@@ -224,18 +229,7 @@ export default function Configuracion() {
               placeholder="Nombre del sector"
               className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
             />
-            <select
-              value={nuevoSector.empresaId}
-              onChange={(e) => setNuevoSector({ ...nuevoSector, empresaId: e.target.value })}
-              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
-            >
-              <option value="">Sin empresa</option>
-              {empresas?.map((emp) => (
-                <option key={emp.id} value={emp.id}>
-                  {emp.nombre}
-                </option>
-              ))}
-            </select>
+            {errorSector && <p className="text-xs text-red-600">{errorSector}</p>}
             <button type="submit" className="bg-primary text-white text-sm px-3 py-1.5 rounded-md w-full">
               Agregar
             </button>

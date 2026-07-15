@@ -28,13 +28,6 @@ function sumHoras(intervals: TimeInterval[]): number {
   }, 0);
 }
 
-/** Redondea horas al incremento más cercano (en minutos), ej. 60 = a la hora más cercana (7.9 -> 8). */
-function redondear(horas: number, incrementoMinutos: number): number {
-  if (!incrementoMinutos) return horas;
-  const incrementoHoras = incrementoMinutos / 60;
-  return Math.round(horas / incrementoHoras) * incrementoHoras;
-}
-
 function parseHoraCorte(fecha: Date, horaCorteSabado: string): Date {
   const [h, m] = horaCorteSabado.split(":").map(Number);
   return localDateTime(fecha, h, m);
@@ -59,14 +52,13 @@ export function calcularDia(
   fecha: Date,
   intervals: TimeInterval[],
   esFeriado: boolean,
-  config: PayrollConfigLike,
-  redondeoMinutos = 0
+  config: PayrollConfigLike
 ): DailyCalcResult {
   const tipoDia = determinarTipoDia(fecha, esFeriado);
   const tratarComoDomingo = tipoDia === "DOMINGO" || (tipoDia === "FERIADO" && config.feriadoComoDomingo);
 
   if (tratarComoDomingo) {
-    const total = redondear(sumHoras(intervals), redondeoMinutos);
+    const total = sumHoras(intervals);
     return {
       tipoDia,
       horasNormales: 0,
@@ -86,8 +78,6 @@ export function calcularDia(
       const despuesStart = i.start > cutoff ? i.start : cutoff;
       if (i.end > despuesStart) despues += (i.end.getTime() - despuesStart.getTime()) / 3_600_000;
     }
-    antes = redondear(antes, redondeoMinutos);
-    despues = redondear(despues, redondeoMinutos);
     const horasNormales = Math.min(antes, config.horasNormalesPorDia);
     const horasExtra50 = Math.max(0, antes - config.horasNormalesPorDia);
     return {
@@ -100,7 +90,7 @@ export function calcularDia(
   }
 
   // HABIL, o FERIADO cuando feriadoComoDomingo = false
-  const total = redondear(sumHoras(intervals), redondeoMinutos);
+  const total = sumHoras(intervals);
   const horasNormales = Math.min(total, config.horasNormalesPorDia);
   const horasExtra50 = Math.max(0, total - config.horasNormalesPorDia);
   return {

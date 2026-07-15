@@ -13,7 +13,7 @@ router.get("/", async (req, res) => {
       ...(scope ? { sectorId: { in: scope } } : {}),
       ...(activo === "true" ? { activo: true } : activo === "false" ? { activo: false } : {}),
     },
-    include: { sector: { include: { empresa: true } }, jornada: true },
+    include: { empresa: true, sector: true },
     orderBy: [{ apellido: "asc" }, { nombre: "asc" }],
   });
   res.json(empleados);
@@ -23,7 +23,7 @@ router.get("/:id", async (req, res) => {
   const scope = sectorScope(req);
   const empleado = await prisma.employee.findUnique({
     where: { id: req.params.id },
-    include: { sector: { include: { empresa: true } }, jornada: true },
+    include: { empresa: true, sector: true },
   });
   if (!empleado) return res.status(404).json({ error: "No encontrado" });
   if (scope && (!empleado.sectorId || !scope.includes(empleado.sectorId))) {
@@ -40,8 +40,8 @@ const empleadoSchema = z.object({
   fechaIngreso: z.coerce.date(),
   valorHoraNormal: z.number().positive(),
   horasTeoricasDiarias: z.number().positive().optional(),
+  empresaId: z.string().min(1),
   sectorId: z.string().nullable().optional(),
-  jornadaId: z.string().nullable().optional(),
   activo: z.boolean().optional(),
 });
 

@@ -72,50 +72,22 @@ async function main() {
     create: { nombre: "POLYSAN" },
   });
 
-  const sectorFrancisco = await prisma.sector.upsert({
-    where: { id: "sector-francisco" },
-    update: {},
-    create: { id: "sector-francisco", nombre: "Francisco", empresaId: polcecal.id },
-  });
-  await prisma.sector.upsert({
+  const sectorAdministracion = await prisma.sector.upsert({
     where: { id: "sector-administracion" },
     update: {},
-    create: { id: "sector-administracion", nombre: "Administración", empresaId: polcecal.id },
+    create: { id: "sector-administracion", nombre: "Administración" },
   });
   await prisma.sector.upsert({
     where: { id: "sector-planta" },
     update: {},
-    create: { id: "sector-planta", nombre: "Planta", empresaId: polysan.id },
+    create: { id: "sector-planta", nombre: "Planta" },
   });
 
   await prisma.userSector.upsert({
-    where: { userId_sectorId: { userId: encargado.id, sectorId: sectorFrancisco.id } },
+    where: { userId_sectorId: { userId: encargado.id, sectorId: sectorAdministracion.id } },
     update: {},
-    create: { userId: encargado.id, sectorId: sectorFrancisco.id },
+    create: { userId: encargado.id, sectorId: sectorAdministracion.id },
   });
-
-  const empleadosDemo = [
-    { legajo: "1001", nombre: "Juan", apellido: "Pérez", valorHoraNormal: 3500, fechaIngreso: "2018-03-01", horasTeoricasDiarias: 8 },
-    { legajo: "1002", nombre: "Carlos", apellido: "Gómez", valorHoraNormal: 3200, fechaIngreso: "2021-06-15", horasTeoricasDiarias: 8 },
-    { legajo: "1003", nombre: "Miguel", apellido: "Fernández", valorHoraNormal: 3800, fechaIngreso: "2010-01-10", horasTeoricasDiarias: 8 },
-    { legajo: "1004", nombre: "Sofía", apellido: "Ramírez", valorHoraNormal: 2000, fechaIngreso: "2026-03-01", horasTeoricasDiarias: 4 },
-  ];
-
-  for (const e of empleadosDemo) {
-    await prisma.employee.upsert({
-      where: { legajo: e.legajo },
-      update: {},
-      create: {
-        legajo: e.legajo,
-        nombre: e.nombre,
-        apellido: e.apellido,
-        valorHoraNormal: e.valorHoraNormal,
-        horasTeoricasDiarias: e.horasTeoricasDiarias,
-        fechaIngreso: new Date(e.fechaIngreso),
-        sectorId: sectorFrancisco.id,
-      },
-    });
-  }
 
   console.log("Seed completado.");
   console.log("Admin: admin@empresa.com / admin123");
