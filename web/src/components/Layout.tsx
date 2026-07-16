@@ -99,7 +99,7 @@ export function Layout() {
     <div className="app-shell">
       {/* Mobile topbar */}
       <div className="mobile-topbar">
-        <Logo width={120} />
+        <img src="/logo.png" alt="POLYSAN S.A. / POLCECAL S.A." style={{ height: 38, width: "auto", objectFit: "contain" }} />
         <button
           onClick={() => setOpen(true)}
           className="text-sidebar-text"

@@ -5,13 +5,21 @@ import { invalidarAsistenciaRelacionada } from "../lib/invalidarAsistencia.js";
 
 const ESTADOS = ["PENDIENTE", "TOMADO"] as const;
 
+interface Franco {
+  id: string;
+  employee: { legajo: string; nombre: string; apellido: string };
+  fechaGenerado: string;
+  horas: number;
+  estado: string;
+}
+
 export default function Francos() {
   const queryClient = useQueryClient();
   const [estado, setEstado] = useState<string>("");
 
   const { data: francos, isLoading } = useQuery({
     queryKey: ["francos-list", estado],
-    queryFn: async () => (await api.get(`/francos${estado ? `?estado=${estado}` : ""}`)).data as any[],
+    queryFn: async () => (await api.get(`/francos${estado ? `?estado=${estado}` : ""}`)).data as Franco[],
   });
 
   const actualizar = useMutation({

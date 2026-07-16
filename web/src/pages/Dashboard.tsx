@@ -430,7 +430,7 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div className="card p-5">
           <h2 className="font-medium text-slate-700 mb-3">Top 10 ausencias (mes en curso)</h2>
           {topAusencias?.length === 0 && <p className="text-sm text-slate-500">Sin ausencias registradas.</p>}
@@ -492,7 +492,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="card p-5">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-medium text-slate-700">Horas trabajadas vs Teóricas por Sector</h2>

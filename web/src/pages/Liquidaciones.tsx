@@ -9,6 +9,20 @@ interface Empleado {
   apellido: string;
 }
 
+interface Liquidacion {
+  id: string;
+  employee: { nombre: string; apellido: string };
+  tipo: string;
+  fechaDesde: string;
+  fechaHasta: string;
+  horasNormales: number;
+  horasExtra50: number;
+  horasExtra100: number;
+  cantidadFrancosPagados: number;
+  totalBruto: number;
+  estado: string;
+}
+
 function firstOfMonth() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
@@ -25,7 +39,7 @@ export default function Liquidaciones() {
   });
   const { data: liquidaciones, isLoading } = useQuery({
     queryKey: ["liquidaciones"],
-    queryFn: async () => (await api.get("/liquidaciones")).data as any[],
+    queryFn: async () => (await api.get("/liquidaciones")).data as Liquidacion[],
   });
 
   const [form, setForm] = useState({
