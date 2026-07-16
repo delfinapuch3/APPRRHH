@@ -23,6 +23,14 @@ const FERIADOS_2026: { fecha: string; nombre: string }[] = [
 ];
 
 async function main() {
+  // Sembrar solo si la base está vacía. Así el seed corre una única vez (primer
+  // deploy) y no resucita empresas/sectores/feriados que un admin haya borrado.
+  const yaInicializada = (await prisma.user.count()) > 0;
+  if (yaInicializada) {
+    console.log("Base ya inicializada, seed omitido.");
+    return;
+  }
+
   await prisma.payrollConfig.upsert({
     where: { id: 1 },
     update: {},
