@@ -5,8 +5,11 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { Prisma } from "@prisma/client";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import express from "express";
 import type { NextFunction, Request, Response } from "express";
+import { prisma } from "./db.js";
 import authRouter from "./routes/auth.js";
 import empleadosRouter from "./routes/empleados.js";
 import importEmpleadosRouter from "./routes/importEmpleados.js";
@@ -26,13 +29,53 @@ import jornadasRouter from "./routes/jornadas.js";
 import analiticoRouter from "./routes/analitico.js";
 import { requireAuth } from "./middleware/auth.js";
 
+// En producción, cortar el arranque si faltan variables de entorno críticas,
+// para no correr con un JWT_SECRET débil por defecto ni sin base de datos.
+const isProd = process.env.NODE_ENV === "production";
+if (isProd) {
+  const faltantes = ["DATABASE_URL", "JWT_SECRET"].filter((k) => !process.env[k]);
+  if (faltantes.length > 0) {
+    console.error(`Faltan variables de entorno obligatorias en producción: ${faltantes.join(", ")}`);
+    process.exit(1);
+  }
+}
+
 const app = express();
-app.use(cors());
+// Detrás del proxy de Render: necesario para que el rate limiter vea la IP real.
+app.set("trust proxy", 1);
+app.use(helmet({ contentSecurityPolicy: false }));
+
+// CORS: por defecto solo se permite el propio origen (el server sirve el
+// frontend, así que no hace falta CORS abierto). En dev se permiten los
+// puertos de Vite. Configurable con CORS_ORIGIN (lista separada por comas).
+const corsOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(",").map((o) => o.trim())
+  : ["http://localhost:5173", "http://localhost:5174"];
+app.use(cors({ origin: corsOrigins }));
 app.use(express.json());
+
+// Rate limiting en autenticación: frena ataques de fuerza bruta al login.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 20, // 20 intentos por IP por ventana
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Demasiados intentos. Probá de nuevo en unos minutos." },
+});
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
-app.use("/api/auth", authRouter);
+// Readiness: verifica que la base responda (para monitoreo/uptime real).
+app.get("/api/ready", async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ ok: true, db: "up" });
+  } catch {
+    res.status(503).json({ ok: false, db: "down" });
+  }
+});
+
+app.use("/api/auth", authLimiter, authRouter);
 app.use("/api/empleados/import", requireAuth, importEmpleadosRouter);
 app.use("/api/empleados", requireAuth, empleadosRouter);
 app.use("/api/sectores", requireAuth, sectoresRouter);
