@@ -57,6 +57,35 @@ Guardá ese string, lo vas a pegar en Render.
 - **Cada `git push` a `main`** dispara un re-deploy automático en Render.
 - **Los datos viven en Neon**, no en el contenedor: los redeploys **no** borran nada.
 
+## Recuperar el acceso de admin (si te olvidás la contraseña)
+
+Las contraseñas se guardan hasheadas, así que no se pueden "leer". Para crear un
+admin nuevo o resetear la clave de uno existente, hay un script que corre **fuera
+de la app**, directo contra la base:
+
+```
+cd server
+npx tsx prisma/reset-admin.ts <email> <password> ["Nombre Apellido"] [ADMIN|ENCARGADO]
+```
+
+Ejemplos:
+```
+# Resetear la clave del admin de siempre
+npx tsx prisma/reset-admin.ts admin@empresa.com NuevaClave123
+
+# Crear un admin nuevo
+npx tsx prisma/reset-admin.ts jefe@polcecal.com MiClave123 "Juan Perez" ADMIN
+```
+
+> **Importante:** el script usa el `DATABASE_URL` del entorno. Para tocar la base de
+> **producción**, poné el connection string de Neon en `DATABASE_URL` (en `server/.env`
+> o inline) antes de correrlo. Cualquiera con ese string puede resetear el admin, así
+> que guardalo con cuidado.
+
+Alternativa sin script: en la consola SQL de Neon o con `npx prisma studio` podés ver
+la tabla `User`, pero igual necesitás generar un hash bcrypt para la contraseña — por
+eso el script es lo más práctico.
+
 ## Desarrollo local (cambió)
 
 La app ya **no usa SQLite**. Para levantarla local, en `server/.env` poné un
