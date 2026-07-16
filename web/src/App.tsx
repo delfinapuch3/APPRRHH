@@ -19,6 +19,7 @@ import Francos from "./pages/Francos.js";
 import Liquidaciones from "./pages/Liquidaciones.js";
 import Configuracion from "./pages/Configuracion.js";
 import AnaliticoPersonal from "./pages/AnaliticoPersonal.js";
+import MiCuenta from "./pages/MiCuenta.js";
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/mi-cuenta" element={<MiCuenta />} />
           <Route path="/administracion/empleados" element={<Empleados />} />
           <Route path="/empleados/:id" element={<EmpleadoDetalle />} />
           <Route path="/analitico-personal" element={<AnaliticoPersonal />} />

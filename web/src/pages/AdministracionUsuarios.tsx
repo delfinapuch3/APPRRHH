@@ -65,6 +65,20 @@ export default function AdministracionUsuarios() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["usuarios"] }),
   });
 
+  // --- borrar usuario ---
+  const eliminar = useMutation({
+    mutationFn: async (id: string) => api.delete(`/usuarios/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["usuarios"] }),
+    onError: (err) => alert(errorMessage(err, "No se pudo eliminar el usuario")),
+  });
+
+  function confirmarEliminar(u: Usuario) {
+    const nombre = u.apellido ? `${u.apellido}, ${u.nombre}` : u.nombre;
+    if (window.confirm(`¿Eliminar definitivamente a ${nombre} (${u.email})? Esta acción no se puede deshacer.`)) {
+      eliminar.mutate(u.id);
+    }
+  }
+
   // --- edición completa (modal) ---
   const [editando, setEditando] = useState<Usuario | null>(null);
   const [edit, setEdit] = useState<EdicionForm | null>(null);
@@ -210,6 +224,11 @@ export default function AdministracionUsuarios() {
                           {!esYo && (
                             <button onClick={() => actualizar.mutate({ id: u.id, activo: !u.activo })} className="btn-ghost">
                               {u.activo ? "Dar de baja" : "Reactivar"}
+                            </button>
+                          )}
+                          {!esYo && (
+                            <button onClick={() => confirmarEliminar(u)} className="btn-ghost text-red-600 hover:text-red-700">
+                              Eliminar
                             </button>
                           )}
                         </td>

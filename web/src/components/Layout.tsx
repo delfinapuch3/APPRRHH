@@ -235,14 +235,28 @@ export function Layout() {
           })}
         </nav>
         <div className="px-3 py-3 border-t border-sidebar-border">
-          {!colapsado && (
-            <div className="px-2 mb-2">
-              <div className="text-sm font-medium text-slate-200 truncate">{user?.nombre}</div>
-              <div className="text-xs text-sidebar-text">
-                {user?.role === "ADMIN" ? "Administrador" : "Encargado de sector"}
+          <NavLink
+            to="/mi-cuenta"
+            onClick={() => setOpen(false)}
+            title={colapsado ? "Mi cuenta" : undefined}
+            className={({ isActive }) =>
+              `flex items-center gap-2.5 w-full px-3 py-2 rounded-lg mb-1 transition ${colapsado ? "justify-center" : ""} ${
+                isActive ? "bg-sidebar-active text-white" : "text-sidebar-text hover:bg-sidebar-hover hover:text-slate-200"
+              }`
+            }
+          >
+            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" className="shrink-0">
+              <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {!colapsado && (
+              <div className="min-w-0 text-left">
+                <div className="text-sm font-medium text-slate-200 truncate">{user?.nombre}</div>
+                <div className="text-xs text-sidebar-text">
+                  {user?.role === "ADMIN" ? "Administrador" : "Encargado de sector"}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </NavLink>
           <button
             onClick={logout}
             title={colapsado ? "Cerrar sesión" : undefined}

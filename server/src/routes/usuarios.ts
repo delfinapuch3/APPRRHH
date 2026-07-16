@@ -98,4 +98,29 @@ router.put("/:id", requireAdmin, async (req, res) => {
   }
 });
 
+router.delete("/:id", requireAdmin, async (req, res) => {
+  const { id } = req.params;
+
+  // Guarda: un admin no puede borrarse a sí mismo.
+  if (id === req.user!.id) {
+    return res.status(400).json({ error: "No podés borrarte a vos mismo" });
+  }
+
+  // Borrado seguro: bloquear si el usuario tiene registros asociados por FK
+  // obligatoria (importaciones, ausencias cargadas o liquidaciones generadas).
+  const [importaciones, ausencias, liquidaciones] = await Promise.all([
+    prisma.importBatch.count({ where: { usuarioId: id } }),
+    prisma.absence.count({ where: { cargadoPorId: id } }),
+    prisma.payrollPeriod.count({ where: { generadoPorId: id } }),
+  ]);
+  if (importaciones + ausencias + liquidaciones > 0) {
+    return res.status(409).json({
+      error: "No se puede borrar: el usuario tiene registros asociados (importaciones, ausencias o liquidaciones). Desactivalo en su lugar.",
+    });
+  }
+
+  await prisma.user.delete({ where: { id } });
+  res.json({ ok: true });
+});
+
 export default router;
