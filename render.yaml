@@ -1,0 +1,23 @@
+# Render Blueprint — despliega la app como un solo servicio Docker (el server
+# sirve la API y el frontend compilado). Base de datos: Postgres externo (Neon).
+#
+# Uso: en Render → New → Blueprint → conectar este repo. Render detecta este
+# archivo. Después, en el servicio, cargar la variable DATABASE_URL con el
+# connection string de Neon (JWT_SECRET se genera solo).
+services:
+  - type: web
+    name: apprrhh
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /api/health
+    # Antes de arrancar: aplica migraciones y siembra el admin (idempotente).
+    dockerCommand: sh -c "npx prisma migrate deploy --schema server/prisma/schema.prisma && npx tsx server/prisma/seed.ts && npm run start"
+    envVars:
+      - key: DATABASE_URL
+        sync: false # se pega a mano el connection string de Neon
+      - key: JWT_SECRET
+        generateValue: true # Render genera un secreto seguro
+      - key: NODE_ENV
+        value: production
