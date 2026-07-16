@@ -21,4 +21,5 @@ RUN npm run build
 ENV NODE_ENV=production
 EXPOSE 4000
 
-CMD ["npm", "run", "start"]
+# Migraciones + seed + arranque (ver deploy-start.sh)
+CMD ["sh", "deploy-start.sh"]

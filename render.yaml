@@ -13,7 +13,8 @@ services:
     region: oregon
     healthCheckPath: /api/health
     # Antes de arrancar: aplica migraciones y siembra el admin (idempotente).
-    dockerCommand: sh -c "npx prisma migrate deploy --schema server/prisma/schema.prisma && npx tsx server/prisma/seed.ts && npm run start"
+    # Va en un script para evitar problemas de comillas en el campo de Render.
+    dockerCommand: sh deploy-start.sh
     envVars:
       - key: DATABASE_URL
         sync: false # se pega a mano el connection string de Neon
