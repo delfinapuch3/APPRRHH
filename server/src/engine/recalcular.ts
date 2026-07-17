@@ -370,8 +370,12 @@ export async function recalcularSectorPeriodo(sectorId: string | null, desde: Da
     where: sectorId ? { sectorId, activo: true } : { activo: true },
     select: { id: true },
   });
-  for (const e of empleados) {
-    await recalcularEmpleadoPeriodo(e.id, desde, hasta);
+  // Recalculamos los empleados en lotes concurrentes (en vez de uno por uno) para
+  // reducir mucho el tiempo total: cada empleado escribe sus propias filas, así
+  // que no hay conflictos entre ellos. El lote acotado evita saturar la base.
+  const LOTE = 8;
+  for (let i = 0; i < empleados.length; i += LOTE) {
+    await Promise.all(empleados.slice(i, i + LOTE).map((e) => recalcularEmpleadoPeriodo(e.id, desde, hasta)));
   }
   return empleados.length;
 }
