@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client.js";
+import { InfoTip } from "../components/InfoTip.js";
 import { labelTipoAusencia } from "../lib/tiposAusencia.js";
 
 interface Licencia {
@@ -31,7 +32,10 @@ export default function Licencias() {
 
   return (
     <div>
-      <h1 className="page-header mb-6">Licencias</h1>
+      <h1 className="page-header mb-6 flex items-center gap-2">
+        Licencias
+        <InfoTip texto="Las licencias del personal (ART, gremial, sin goce de sueldo, examen, etc.). Son un tipo de ausencia con tratamiento particular en el cálculo de horas y sueldo." />
+      </h1>
 
       <div className="flex gap-4 items-end mb-6 card p-4">
         <div>

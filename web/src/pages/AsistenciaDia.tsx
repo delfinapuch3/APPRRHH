@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client.js";
+import { InfoTip } from "../components/InfoTip.js";
 import { TIPOS_AUSENCIA, labelTipoAusencia } from "../lib/tiposAusencia.js";
 import { invalidarAsistenciaRelacionada } from "../lib/invalidarAsistencia.js";
 import FichadaEditModal from "../components/FichadaEditModal.js";
@@ -58,7 +59,10 @@ export default function AsistenciaDia() {
 
   return (
     <div>
-      <h1 className="page-header mb-6">Asistencia por día</h1>
+      <h1 className="page-header mb-6 flex items-center gap-2">
+        Asistencia por día
+        <InfoTip texto="Quién trabajó y quién faltó en un día puntual, con las horas de cada uno. Sirve para revisar y clasificar ausencias día por día." />
+      </h1>
 
       <div className="flex gap-4 items-end mb-6 card p-4">
         <div>

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client.js";
+import { InfoTip } from "../components/InfoTip.js";
+import { useConfirm } from "../components/ConfirmProvider.js";
 
 interface Jornada {
   id: string;
@@ -13,6 +15,7 @@ interface Jornada {
 
 export default function AdministracionJornadas() {
   const queryClient = useQueryClient();
+  const confirmar = useConfirm();
   const { data: jornadas, isLoading } = useQuery({
     queryKey: ["jornadas"],
     queryFn: async () => (await api.get("/jornadas")).data as Jornada[],
@@ -51,7 +54,10 @@ export default function AdministracionJornadas() {
 
   return (
     <div>
-      <h1 className="page-header mb-6">Turnos</h1>
+      <h1 className="page-header mb-6 flex items-center gap-2">
+        Turnos
+        <InfoTip texto="Los horarios de trabajo (ej. 08:00 a 16:00) con su tolerancia de minutos. El sistema los usa para detectar entradas tarde y salidas tempranas al procesar las marcaciones." />
+      </h1>
       <div className="grid grid-cols-3 gap-6">
         <div className="card p-5 col-span-1">
           <h2 className="font-medium text-slate-700 mb-3">Nuevo turno</h2>
@@ -151,7 +157,18 @@ export default function AdministracionJornadas() {
                     </td>
                     <td className="py-2">{j.toleranciaMinutos} min</td>
                     <td className="py-2 text-right">
-                      <button onClick={() => eliminar.mutate(j.id)} className="text-red-500 text-xs">
+                      <button
+                        onClick={async () => {
+                          const ok = await confirmar({
+                            titulo: "Eliminar turno",
+                            mensaje: `¿Eliminar el turno "${j.nombre}" (${j.horaInicio} - ${j.horaFin})? Esta acción no se puede deshacer.`,
+                            textoConfirmar: "Eliminar",
+                            peligro: true,
+                          });
+                          if (ok) eliminar.mutate(j.id);
+                        }}
+                        className="text-red-500 text-xs"
+                      >
                         eliminar
                       </button>
                     </td>

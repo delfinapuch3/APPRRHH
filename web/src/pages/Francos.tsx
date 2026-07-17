@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client.js";
+import { InfoTip } from "../components/InfoTip.js";
 import { invalidarAsistenciaRelacionada } from "../lib/invalidarAsistencia.js";
 
 const ESTADOS = ["PENDIENTE", "TOMADO"] as const;
@@ -41,7 +42,10 @@ export default function Francos() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="page-header">Francos compensatorios</h1>
+        <h1 className="page-header flex items-center gap-2">
+          Francos compensatorios
+          <InfoTip texto="Días de descanso que genera el sistema cuando un empleado trabaja un domingo o feriado. Podés marcarlos como tomados; los que no, se pagan en la liquidación." />
+        </h1>
         <button onClick={exportar} className="text-sm text-primary hover:underline">
           Exportar
         </button>

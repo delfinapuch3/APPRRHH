@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client.js";
+import { InfoTip } from "../components/InfoTip.js";
 import { invalidarAsistenciaRelacionada } from "../lib/invalidarAsistencia.js";
 
 interface Empleado {
@@ -43,7 +44,10 @@ export default function Vacaciones() {
 
   return (
     <div>
-      <h1 className="page-header mb-6">Vacaciones</h1>
+      <h1 className="page-header mb-6 flex items-center gap-2">
+        Vacaciones
+        <InfoTip texto="El balance de días de vacaciones de cada empleado según su antigüedad, y los períodos que ya se tomó. Elegí un empleado para ver y cargar sus vacaciones." />
+      </h1>
 
       <div className="flex gap-4 items-end mb-6 card p-4">
         <div>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client.js";
+import { InfoTip } from "../components/InfoTip.js";
 import { TIPOS_AUSENCIA } from "../lib/tiposAusencia.js";
 import { invalidarAsistenciaRelacionada } from "../lib/invalidarAsistencia.js";
 
@@ -57,7 +58,10 @@ export default function AsistenciaPeriodo() {
 
   return (
     <div>
-      <h1 className="page-header mb-6">Asistencia por período</h1>
+      <h1 className="page-header mb-6 flex items-center gap-2">
+        Asistencia por período
+        <InfoTip texto="Resumen de asistencia de todos los empleados en un rango de fechas: presentes, ausencias justificadas/injustificadas y % de asistencia. Acá clasificás las faltas que quedaron sin clasificar." />
+      </h1>
 
       <div className="flex gap-4 items-end mb-6 card p-4">
         <div>

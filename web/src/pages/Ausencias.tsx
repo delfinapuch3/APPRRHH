@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client.js";
+import { InfoTip } from "../components/InfoTip.js";
 
 interface AusenciaInjustificada {
   id: string;
@@ -29,7 +30,10 @@ export default function Ausencias() {
 
   return (
     <div>
-      <h1 className="page-header mb-6">Ausencias</h1>
+      <h1 className="page-header mb-6 flex items-center gap-2">
+        Ausencias
+        <InfoTip texto="Las ausencias cargadas (enfermedad, injustificadas, etc.). Cada una afecta el cálculo de asistencia y, según el tipo, puede impactar la liquidación." />
+      </h1>
 
       <div className="flex gap-4 items-end mb-6 card p-4">
         <div>

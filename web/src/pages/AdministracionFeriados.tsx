@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client.js";
+import { InfoTip } from "../components/InfoTip.js";
+import { useConfirm } from "../components/ConfirmProvider.js";
 
 interface Feriado {
   id: string;
@@ -10,6 +12,7 @@ interface Feriado {
 
 export default function AdministracionFeriados() {
   const queryClient = useQueryClient();
+  const confirmar = useConfirm();
   const { data: feriados } = useQuery({
     queryKey: ["feriados"],
     queryFn: async () => (await api.get("/configuracion/feriados")).data as Feriado[],
@@ -30,7 +33,10 @@ export default function AdministracionFeriados() {
 
   return (
     <div>
-      <h1 className="page-header mb-6">Feriados</h1>
+      <h1 className="page-header mb-6 flex items-center gap-2">
+        Feriados
+        <InfoTip texto="Los días feriados del año. El sistema los usa para el cálculo de horas: trabajar un feriado genera francos compensatorios y se paga con recargo, igual que un domingo." />
+      </h1>
       <div className="card p-5 max-w-xl">
         <ul className="text-sm mb-3 space-y-1 max-h-64 overflow-auto">
           {feriados?.map((f) => (
@@ -38,7 +44,18 @@ export default function AdministracionFeriados() {
               <span>
                 {new Date(f.fecha).toLocaleDateString("es-AR", { timeZone: "UTC" })} - {f.nombre}
               </span>
-              <button onClick={() => borrarFeriado.mutate(f.id)} className="text-red-500 text-xs">
+              <button
+                onClick={async () => {
+                  const ok = await confirmar({
+                    titulo: "Eliminar feriado",
+                    mensaje: `¿Eliminar el feriado "${f.nombre}"? Esta acción no se puede deshacer.`,
+                    textoConfirmar: "Eliminar",
+                    peligro: true,
+                  });
+                  if (ok) borrarFeriado.mutate(f.id);
+                }}
+                className="text-red-500 text-xs"
+              >
                 eliminar
               </button>
             </li>
