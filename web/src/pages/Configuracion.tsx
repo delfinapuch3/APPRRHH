@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { InfoTip } from "../components/InfoTip.js";
+import { useConfirm } from "../components/ConfirmProvider.js";
 import { api, errorMessage } from "../api/client.js";
 
 interface Config {
@@ -14,6 +16,20 @@ interface Config {
 
 export default function Configuracion() {
   const queryClient = useQueryClient();
+  const confirmar = useConfirm();
+
+  async function onDesactivarSector(s: { id: string; nombre: string; activo: boolean }) {
+    if (s.activo) {
+      const ok = await confirmar({
+        titulo: "Desactivar sector",
+        mensaje: `El sector "${s.nombre}" va a dejar de aparecer en los selectores para asignar empleados y usuarios. No se borra: podés reactivarlo cuando quieras. ¿Confirmás?`,
+        textoConfirmar: "Desactivar",
+      });
+      if (ok) toggleSector.mutate({ id: s.id, activo: false });
+    } else {
+      toggleSector.mutate({ id: s.id, activo: true });
+    }
+  }
   const { data: config } = useQuery({
     queryKey: ["configuracion"],
     queryFn: async () => (await api.get("/configuracion")).data as Config,
@@ -66,10 +82,16 @@ export default function Configuracion() {
 
   return (
     <div>
-      <h1 className="page-header mb-6">Configuración</h1>
+      <h1 className="page-header mb-6 flex items-center gap-2">
+        Configuración
+        <InfoTip texto="Los parámetros con los que el sistema calcula todo: reglas de horas normales y extra, francos, escala de vacaciones, y el catálogo de empresas y sectores. Cambiar esto afecta cómo se calculan las liquidaciones." />
+      </h1>
 
       <div className="card p-5 mb-6">
-        <h2 className="font-medium text-slate-700 mb-3">Reglas de cálculo de horas</h2>
+        <h2 className="font-medium text-slate-700 mb-3 flex items-center gap-1.5">
+          Reglas de cálculo de horas
+          <InfoTip texto="Definen cómo se calculan las horas y su valor: cuántas horas son 'normales' por día, desde qué hora del sábado se paga extra, y los multiplicadores de las horas extra al 50% y 100%. Estos valores se usan en cada liquidación." />
+        </h2>
         <div className="grid grid-cols-3 gap-4 mb-4">
           <div>
             <label className="block text-xs text-slate-500 mb-1">Horas normales por día</label>
@@ -196,7 +218,10 @@ export default function Configuracion() {
         </div>
 
         <div className="card p-5">
-          <h2 className="font-medium text-slate-700 mb-3">Sectores</h2>
+          <h2 className="font-medium text-slate-700 mb-3 flex items-center gap-1.5">
+            Sectores
+            <InfoTip texto="Las áreas de trabajo (ej. Producción, Mantenimiento). Cada empleado pertenece a un sector, y a los encargados se les asignan sectores. Podés desactivar un sector para que deje de aparecer sin perder el historial." />
+          </h2>
           <p className="text-xs text-slate-400 mb-2">
             Un sector agrupa empleados de ambas empresas (ej. "Calidad" incluye a Calidad de Polcecal y de Polysan).
           </p>
@@ -208,7 +233,7 @@ export default function Configuracion() {
                   {!s.activo && <span className="ml-1 text-xs">· inactivo</span>}
                 </span>
                 <button
-                  onClick={() => toggleSector.mutate({ id: s.id, activo: !s.activo })}
+                  onClick={() => onDesactivarSector(s)}
                   className="text-xs underline text-slate-500 hover:text-slate-700 whitespace-nowrap"
                 >
                   {s.activo ? "Desactivar" : "Reactivar"}

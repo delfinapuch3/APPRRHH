@@ -6,6 +6,8 @@ import { useAuth } from "../auth/AuthContext.js";
 import { TIPOS_AUSENCIA, labelTipoAusencia } from "../lib/tiposAusencia.js";
 import FichadaEditModal from "../components/FichadaEditModal.js";
 import { invalidarAsistenciaRelacionada } from "../lib/invalidarAsistencia.js";
+import { InfoTip } from "../components/InfoTip.js";
+import { useConfirm } from "../components/ConfirmProvider.js";
 
 interface AusenciaItem {
   id: string;
@@ -90,6 +92,7 @@ export default function EmpleadoDetalle() {
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const confirmar = useConfirm();
   const [tab, setTab] = useState<Tab>("fichadas");
   const [editando, setEditando] = useState(false);
   const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
@@ -315,11 +318,15 @@ export default function EmpleadoDetalle() {
               {empleado.activo ? "Dar de baja" : "Reactivar"}
             </button>
             <button
-              onClick={() => {
+              onClick={async () => {
                 setErrorEliminar(null);
-                if (confirm(`¿Eliminar definitivamente a ${empleado.apellido}, ${empleado.nombre}? Esta acción no se puede deshacer.`)) {
-                  eliminar.mutate();
-                }
+                const ok = await confirmar({
+                  titulo: "Eliminar empleado",
+                  mensaje: `¿Eliminar definitivamente a ${empleado.apellido}, ${empleado.nombre}? Esta acción no se puede deshacer. Si tiene fichadas o liquidaciones asociadas no se podrá borrar; en ese caso, dalo de baja.`,
+                  textoConfirmar: "Eliminar",
+                  peligro: true,
+                });
+                if (ok) eliminar.mutate();
               }}
               className="bg-white border border-red-300 text-red-600 text-sm px-3 py-1.5 rounded-md hover:bg-red-50"
             >
@@ -754,14 +761,14 @@ export default function EmpleadoDetalle() {
                         Editar
                       </button>
                       <button
-                        onClick={() => {
-                          if (
-                            confirm(
-                              `¿Eliminar esta ausencia (${new Date(a.fechaDesde).toLocaleDateString("es-AR", { timeZone: "UTC" })} - ${new Date(a.fechaHasta).toLocaleDateString("es-AR", { timeZone: "UTC" })})? Esta acción no se puede deshacer.`
-                            )
-                          ) {
-                            eliminarAusencia.mutate(a.id);
-                          }
+                        onClick={async () => {
+                          const ok = await confirmar({
+                            titulo: "Eliminar ausencia",
+                            mensaje: `¿Eliminar esta ausencia (${new Date(a.fechaDesde).toLocaleDateString("es-AR", { timeZone: "UTC" })} - ${new Date(a.fechaHasta).toLocaleDateString("es-AR", { timeZone: "UTC" })})? Esta acción no se puede deshacer.`,
+                            textoConfirmar: "Eliminar",
+                            peligro: true,
+                          });
+                          if (ok) eliminarAusencia.mutate(a.id);
                         }}
                         className="text-red-600 underline text-xs ml-3"
                       >
@@ -877,14 +884,14 @@ export default function EmpleadoDetalle() {
                         Editar
                       </button>
                       <button
-                        onClick={() => {
-                          if (
-                            confirm(
-                              `¿Eliminar este período de vacaciones (${new Date(p.fechaDesde).toLocaleDateString("es-AR", { timeZone: "UTC" })} - ${new Date(p.fechaHasta).toLocaleDateString("es-AR", { timeZone: "UTC" })})? Esta acción no se puede deshacer.`
-                            )
-                          ) {
-                            eliminarVacacion.mutate(p.id);
-                          }
+                        onClick={async () => {
+                          const ok = await confirmar({
+                            titulo: "Eliminar período de vacaciones",
+                            mensaje: `¿Eliminar este período (${new Date(p.fechaDesde).toLocaleDateString("es-AR", { timeZone: "UTC" })} - ${new Date(p.fechaHasta).toLocaleDateString("es-AR", { timeZone: "UTC" })})? Esta acción no se puede deshacer.`,
+                            textoConfirmar: "Eliminar",
+                            peligro: true,
+                          });
+                          if (ok) eliminarVacacion.mutate(p.id);
                         }}
                         className="text-red-600 underline text-xs ml-3"
                       >
