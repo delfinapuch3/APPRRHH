@@ -4,6 +4,7 @@ import { prisma } from "../db.js";
 import { sectorScope } from "../middleware/auth.js";
 import { recalcularEmpleadoPeriodo } from "../engine/recalcular.js";
 import { sendXlsx } from "../lib/xlsxExport.js";
+import { formatHHMM, localDateTime, toUtcDateOnly } from "../lib/dates.js";
 
 const router = Router();
 
@@ -46,19 +47,36 @@ router.get("/export.xlsx", async (req, res) => {
       f.employee.legajo,
       `${f.employee.apellido}, ${f.employee.nombre}`,
       f.fecha.toLocaleDateString("es-AR", { timeZone: "UTC" }),
-      f.horaEntrada.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }),
-      f.horaSalida ? f.horaSalida.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }) : "",
+      formatHHMM(f.horaEntrada),
+      f.horaSalida ? formatHHMM(f.horaSalida) : "",
       f.origen,
     ]),
   ];
   sendXlsx(res, "fichadas.xlsx", "Fichadas", rows);
 });
 
+// El frontend manda la hora como "YYYY-MM-DDTHH:MM:SS" sin zona horaria (hora
+// de pared en Argentina). z.coerce.date() usaría new Date(string), que en un
+// string sin zona se interpreta con el huso horario del proceso que corre el
+// código — rompe en Render (Docker, TZ=UTC). Por eso se parsea a mano con
+// localDateTime(), que siempre asume Argentina sin importar el huso del server.
+const horaDePared = z.union([z.string(), z.date()]).transform((value, ctx) => {
+  if (value instanceof Date) return value;
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!match) {
+    ctx.addIssue({ code: "custom", message: "Formato de fecha/hora inválido" });
+    return z.NEVER;
+  }
+  const [, y, m, d, h, mi, s] = match;
+  const fecha = toUtcDateOnly(Number(y), Number(m) - 1, Number(d));
+  return localDateTime(fecha, Number(h), Number(mi), s ? Number(s) : 0);
+});
+
 const fichadaSchema = z.object({
   employeeId: z.string().min(1),
   fecha: z.coerce.date(),
-  horaEntrada: z.coerce.date(),
-  horaSalida: z.coerce.date().nullable().optional(),
+  horaEntrada: horaDePared,
+  horaSalida: horaDePared.nullable().optional(),
   observaciones: z.string().optional(),
 });
 
