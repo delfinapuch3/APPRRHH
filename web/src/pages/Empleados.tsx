@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, errorMessage } from "../api/client.js";
 import { useAuth } from "../auth/AuthContext.js";
+import { InfoTip } from "../components/InfoTip.js";
+import { useConfirm } from "../components/ConfirmProvider.js";
 
 interface Empleado {
   id: string;
@@ -55,6 +57,7 @@ const MAPPING_FIELDS = [
 export default function Empleados() {
   const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
+  const confirmar = useConfirm();
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [mostrarInactivos, setMostrarInactivos] = useState(false);
@@ -197,7 +200,10 @@ export default function Empleados() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="page-header">Empleados</h1>
+        <h1 className="page-header flex items-center gap-2">
+          Empleados
+          <InfoTip texto="Los operarios/trabajadores de la empresa (no confundir con los usuarios que entran al sistema). Podés cargarlos uno por uno o importar una planilla. Cada empleado tiene su legajo, valor hora, sector y empresa." />
+        </h1>
         <div className="flex items-center gap-4">
           <label className="flex items-center gap-2 text-sm text-slate-600">
             <input type="checkbox" checked={mostrarInactivos} onChange={(e) => setMostrarInactivos(e.target.checked)} />
@@ -248,7 +254,10 @@ export default function Empleados() {
 
       {showImport && (
         <div className="card p-5 mb-6">
-          <h2 className="font-medium text-slate-700 mb-1">Importar planilla de empleados</h2>
+          <h2 className="font-medium text-slate-700 mb-1 flex items-center gap-1.5">
+            Importar planilla de empleados
+            <InfoTip texto="Subís un Excel/CSV con una fila por empleado y decís qué columna es cada dato (legajo, nombre, valor hora, etc.). Si el legajo ya existe se actualizan sus datos; si no, se crea. La empresa/sector se crean solos si no existían." />
+          </h2>
           <p className="text-sm text-slate-500 mb-3">
             Subí un Excel/CSV con una fila por empleado (ej. la nómina completa de RRHH). Columnas necesarias:
             Legajo, Nombre, Apellido y Valor hora normal. Sindicato, Sector, horas teóricas diarias, fecha de
@@ -313,7 +322,14 @@ export default function Empleados() {
                 </p>
               )}
               <button
-                onClick={() => confirmMutation.mutate()}
+                onClick={async () => {
+                  const ok = await confirmar({
+                    titulo: "Confirmar importación",
+                    mensaje: `Se van a crear o actualizar hasta ${preview?.totalRows ?? 0} empleados desde la planilla. Los que ya existan (por legajo) se actualizan. ¿Confirmás?`,
+                    textoConfirmar: "Importar",
+                  });
+                  if (ok) confirmMutation.mutate();
+                }}
                 disabled={!mapping.legajo || !mapping.nombre || !mapping.apellido || !mapping.valorHoraNormal || confirmMutation.isPending}
                 className="bg-primary text-white text-sm px-4 py-2 rounded-md hover:bg-primary-dark disabled:opacity-50"
               >

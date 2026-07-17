@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { InfoTip } from "../components/InfoTip.js";
+import { useConfirm } from "../components/ConfirmProvider.js";
 import { api, errorMessage } from "../api/client.js";
 
 interface Empleado {
@@ -29,6 +31,7 @@ interface Fichada {
 
 export default function Fichadas() {
   const queryClient = useQueryClient();
+  const confirmar = useConfirm();
   const { data: empleados } = useQuery({
     queryKey: ["empleados"],
     queryFn: async () => (await api.get("/empleados")).data as Empleado[],
@@ -116,11 +119,17 @@ export default function Fichadas() {
 
   return (
     <div>
-      <h1 className="page-header mb-6">Marcaciones</h1>
+      <h1 className="page-header mb-6 flex items-center gap-2">
+        Marcaciones
+        <InfoTip texto="Las entradas y salidas de cada empleado. Podés importarlas desde el archivo del reloj biométrico o cargarlas a mano. Con estas marcaciones el sistema calcula las horas trabajadas, extras y ausencias." />
+      </h1>
 
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div className="card p-5">
-          <h2 className="font-medium text-slate-700 mb-3">Importar archivo del reloj</h2>
+          <h2 className="font-medium text-slate-700 mb-3 flex items-center gap-1.5">
+            Importar archivo del reloj
+            <InfoTip texto="Subí el Excel/CSV que exporta el reloj biométrico. Elegí qué columna es el legajo, la fecha y los horarios, y el sistema carga todas las marcaciones de una." />
+          </h2>
           <input
             type="file"
             accept=".xlsx,.xls,.csv"
@@ -156,7 +165,10 @@ export default function Fichadas() {
               <p className="text-sm text-slate-500 mb-2">{preview.totalRows} filas encontradas. Mapeá las columnas:</p>
 
               <div className="mb-3">
-                <label className="block text-xs text-slate-500 mb-1">Formato de horarios</label>
+                <label className="text-xs text-slate-500 mb-1 flex items-center gap-1">
+                  Formato de horarios
+                  <InfoTip texto="Depende de cómo viene tu archivo. 'Separadas': una columna para la hora de entrada y otra para la salida. 'Combinada': una sola columna con todo junto, ej. 'E 08:07 - S 15:56'." />
+                </label>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -266,7 +278,14 @@ export default function Fichadas() {
               )}
 
               <button
-                onClick={() => confirmMutation.mutate()}
+                onClick={async () => {
+                  const ok = await confirmar({
+                    titulo: "Confirmar importación",
+                    mensaje: `Se van a importar las marcaciones de la planilla (${preview?.totalRows ?? 0} filas). ¿Confirmás?`,
+                    textoConfirmar: "Importar",
+                  });
+                  if (ok) confirmMutation.mutate();
+                }}
                 disabled={
                   !mapping.legajo ||
                   !mapping.fecha ||
