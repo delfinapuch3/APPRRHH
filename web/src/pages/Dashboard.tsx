@@ -121,10 +121,12 @@ function StatCard({
   ring,
   icon,
   onClick,
+  cargando,
 }: {
   titulo: string;
   cantidad: number;
   porcentaje: number;
+  cargando?: boolean;
   bg: string;
   ring: string;
   icon: React.ReactNode;
@@ -139,10 +141,10 @@ function StatCard({
         <div className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center">{icon}</div>
         <div>
           <div className="text-sm opacity-90">{titulo}</div>
-          <div className="text-3xl font-bold">{cantidad}</div>
+          <div className="text-3xl font-bold">{cargando ? "…" : cantidad}</div>
         </div>
       </div>
-      <Gauge porcentaje={porcentaje} color={ring} />
+      <Gauge porcentaje={cargando ? 0 : porcentaje} color={ring} />
     </button>
   );
 }
@@ -312,7 +314,7 @@ export default function Dashboard() {
     return s ? `?${s}` : "";
   }
 
-  const { data: resumen } = useQuery({
+  const { data: resumen, isFetching: cargandoResumen } = useQuery({
     queryKey: ["dashboard-resumen-hoy", empresaId, sectorId],
     queryFn: async () => (await api.get(`/dashboard/resumen-hoy${buildQS({ empresaId, sectorId })}`)).data as ResumenHoy,
   });
@@ -394,6 +396,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 gap-4 mb-6">
         <StatCard
           titulo="Presentes"
+          cargando={cargandoResumen}
           cantidad={resumen?.presentes.cantidad ?? 0}
           porcentaje={resumen?.presentes.porcentaje ?? 0}
           bg="bg-primary"
@@ -403,6 +406,7 @@ export default function Dashboard() {
         />
         <StatCard
           titulo="Ausentes"
+          cargando={cargandoResumen}
           cantidad={resumen?.ausentes.cantidad ?? 0}
           porcentaje={resumen?.ausentes.porcentaje ?? 0}
           bg="bg-rose-500"
@@ -412,6 +416,7 @@ export default function Dashboard() {
         />
         <StatCard
           titulo="Tardes"
+          cargando={cargandoResumen}
           cantidad={resumen?.tardes.cantidad ?? 0}
           porcentaje={resumen?.tardes.porcentaje ?? 0}
           bg="bg-accent"
@@ -421,6 +426,7 @@ export default function Dashboard() {
         />
         <StatCard
           titulo="Vacaciones"
+          cargando={cargandoResumen}
           cantidad={resumen?.vacaciones.cantidad ?? 0}
           porcentaje={resumen?.vacaciones.porcentaje ?? 0}
           bg="bg-violet-400"

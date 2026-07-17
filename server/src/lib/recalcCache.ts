@@ -40,3 +40,18 @@ export async function recalcularSectorPeriodoCacheado(sectorId: string | null, d
     await recalcularSectorPeriodo(sectorId, desde, hasta);
   });
 }
+
+/**
+ * Recálculo para lecturas que dependen SOLO del alcance del usuario (todos, o sus
+ * sectores si es encargado) y del período — NO de los filtros de empresa/sector
+ * elegidos en la UI. Los filtros solo cambian qué se consulta después, no qué se
+ * recalcula. Así, cambiar de "Todas" a una empresa/sector puntual es un cache hit
+ * instantáneo en vez de un recálculo nuevo.
+ */
+export async function recalcularParaLectura(scope: string[] | null, desde: Date, hasta: Date): Promise<void> {
+  if (scope === null) {
+    await recalcularSectorPeriodoCacheado(null, desde, hasta);
+  } else {
+    for (const sid of scope) await recalcularSectorPeriodoCacheado(sid, desde, hasta);
+  }
+}

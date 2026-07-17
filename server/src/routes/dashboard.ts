@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
 import { sectorScope } from "../middleware/auth.js";
-import { recalcularSectorPeriodoCacheado } from "../lib/recalcCache.js";
+import { recalcularSectorPeriodoCacheado, recalcularParaLectura } from "../lib/recalcCache.js";
 import { addUtcDays, utcDateOnlyFrom } from "../lib/dates.js";
 import { SECTORES_LUNES_A_VIERNES } from "../lib/constants.js";
 
@@ -42,13 +42,10 @@ router.get("/resumen-hoy", async (req, res) => {
   const empleados = await empleadosPermitidos(scope, { empresaId, sectorId });
   const empleadoIds = empleados.map((e) => e.id);
 
-  if (scope === null && !empresaId && !sectorId) {
-    await recalcularSectorPeriodoCacheado(null, hoy, hoy);
-  } else {
-    for (const sid of new Set(empleados.map((e) => e.sectorId).filter((x): x is string => !!x))) {
-      await recalcularSectorPeriodoCacheado(sid, hoy, hoy);
-    }
-  }
+  // El recálculo depende solo del alcance del usuario y del período, no de los
+  // filtros de empresa/sector (esos solo filtran la consulta). Así cambiar de
+  // filtro no dispara un recálculo nuevo: es cache hit.
+  await recalcularParaLectura(scope, hoy, hoy);
 
   const [calculos, tardanzasManuales, vacacionesHoy] = await Promise.all([
     prisma.dailyCalculation.findMany({ where: { employeeId: { in: empleadoIds }, fecha: hoy } }),
@@ -91,13 +88,10 @@ router.get("/detalle-hoy", async (req, res) => {
   const empleados = await empleadosPermitidos(scope, { empresaId, sectorId });
   const empleadoIds = empleados.map((e) => e.id);
 
-  if (scope === null && !empresaId && !sectorId) {
-    await recalcularSectorPeriodoCacheado(null, hoy, hoy);
-  } else {
-    for (const sid of new Set(empleados.map((e) => e.sectorId).filter((x): x is string => !!x))) {
-      await recalcularSectorPeriodoCacheado(sid, hoy, hoy);
-    }
-  }
+  // El recálculo depende solo del alcance del usuario y del período, no de los
+  // filtros de empresa/sector (esos solo filtran la consulta). Así cambiar de
+  // filtro no dispara un recálculo nuevo: es cache hit.
+  await recalcularParaLectura(scope, hoy, hoy);
 
   const [calculos, tardanzasManuales, vacaciones] = await Promise.all([
     prisma.dailyCalculation.findMany({ where: { employeeId: { in: empleadoIds }, fecha: hoy } }),
@@ -138,13 +132,7 @@ router.get("/top-ausencias", async (req, res) => {
   const empleados = await empleadosPermitidos(scope, { empresaId, sectorId });
   const empleadoIds = empleados.map((e) => e.id);
 
-  if (scope === null && !empresaId && !sectorId) {
-    await recalcularSectorPeriodoCacheado(null, desde, hasta);
-  } else {
-    for (const sid of new Set(empleados.map((e) => e.sectorId).filter((x): x is string => !!x))) {
-      await recalcularSectorPeriodoCacheado(sid, desde, hasta);
-    }
-  }
+  await recalcularParaLectura(scope, desde, hasta);
 
   const calculos = await prisma.dailyCalculation.findMany({
     where: { employeeId: { in: empleadoIds }, fecha: { gte: desde, lte: hasta }, ausente: true },
@@ -172,13 +160,7 @@ router.get("/top-tardanzas", async (req, res) => {
   const empleados = await empleadosPermitidos(scope, { empresaId, sectorId });
   const empleadoIds = empleados.map((e) => e.id);
 
-  if (scope === null && !empresaId && !sectorId) {
-    await recalcularSectorPeriodoCacheado(null, desde, hasta);
-  } else {
-    for (const sid of new Set(empleados.map((e) => e.sectorId).filter((x): x is string => !!x))) {
-      await recalcularSectorPeriodoCacheado(sid, desde, hasta);
-    }
-  }
+  await recalcularParaLectura(scope, desde, hasta);
 
   const calculos = await prisma.dailyCalculation.findMany({
     where: { employeeId: { in: empleadoIds }, fecha: { gte: desde, lte: hasta }, OR: [{ tarde: true }, { retiroAnticipado: true }] },
@@ -231,9 +213,9 @@ router.get("/horas-por-sector", async (req, res) => {
   const empleados = await empleadosPermitidos(scope, { empresaId });
   const porSector = agruparPorSector(empleados);
 
+  await recalcularParaLectura(scope, desde, hasta);
   const resultado = [];
   for (const [sectorId, emps] of porSector) {
-    await recalcularSectorPeriodoCacheado(sectorId, desde, hasta);
     const empleadoIds = emps.map((e) => e.id);
     const calculos = await prisma.dailyCalculation.findMany({
       where: { employeeId: { in: empleadoIds }, fecha: { gte: desde, lte: hasta } },
@@ -269,9 +251,9 @@ router.get("/horas-extra-por-sector", async (req, res) => {
   const porSector = agruparPorSector(empleados);
   const config = await prisma.payrollConfig.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
 
+  await recalcularParaLectura(scope, desde, hasta);
   const resultado = [];
   for (const [sectorId, emps] of porSector) {
-    await recalcularSectorPeriodoCacheado(sectorId, desde, hasta);
     const empleadoIds = emps.map((e) => e.id);
     const valorHoraPorEmpleado = new Map(
       (await prisma.employee.findMany({ where: { id: { in: empleadoIds } }, select: { id: true, valorHoraNormal: true } })).map((e) => [
