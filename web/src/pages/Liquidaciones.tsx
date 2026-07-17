@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client.js";
+import { InfoTip } from "../components/InfoTip.js";
+import { useConfirm } from "../components/ConfirmProvider.js";
 
 interface Empleado {
   id: string;
@@ -33,6 +35,7 @@ function today() {
 
 export default function Liquidaciones() {
   const queryClient = useQueryClient();
+  const confirmar = useConfirm();
   const { data: empleados } = useQuery({
     queryKey: ["empleados"],
     queryFn: async () => (await api.get("/empleados")).data as Empleado[],
@@ -65,6 +68,19 @@ export default function Liquidaciones() {
       }
     },
   });
+
+  async function onGenerar(e: React.FormEvent) {
+    e.preventDefault();
+    const emp = empleados?.find((x) => x.id === form.employeeId);
+    const ok = await confirmar({
+      titulo: "Generar liquidación",
+      mensaje: `Se va a generar la liquidación ${form.tipo.toLowerCase()} de ${
+        emp ? `${emp.apellido}, ${emp.nombre}` : "el empleado"
+      } para el período ${form.fechaDesde} a ${form.fechaHasta}. ¿Confirmás?`,
+      textoConfirmar: "Generar",
+    });
+    if (ok) generar.mutate();
+  }
 
   async function exportar(id: string) {
     const res = await api.get(`/liquidaciones/${id}/export.xlsx`, { responseType: "blob" });
@@ -101,14 +117,11 @@ export default function Liquidaciones() {
       <h1 className="page-header mb-6">Liquidaciones</h1>
 
       <div className="card p-5 mb-6">
-        <h2 className="font-medium text-slate-700 mb-3">Generar liquidación</h2>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            generar.mutate();
-          }}
-          className="flex gap-3 items-end flex-wrap"
-        >
+        <h2 className="font-medium text-slate-700 mb-3 flex items-center gap-1.5">
+          Generar liquidación
+          <InfoTip texto="Calcula el sueldo de un empleado para el período elegido: horas normales, extra 50% y 100%, y francos pagados. Solo se incluyen las horas extra ya validadas desde la ficha del empleado." />
+        </h2>
+        <form onSubmit={onGenerar} className="flex gap-3 items-end flex-wrap">
           <div>
             <label className="block text-xs text-slate-500 mb-1">Empleado</label>
             <select
@@ -126,7 +139,10 @@ export default function Liquidaciones() {
             </select>
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Tipo</label>
+            <label className="text-xs text-slate-500 mb-1 flex items-center gap-1">
+              Tipo
+              <InfoTip texto="Quincenal: del 1 al 15, o del 16 a fin de mes. Mensual: el mes completo. Define qué período abarca la liquidación." />
+            </label>
             <select
               value={form.tipo}
               onChange={(e) => setForm({ ...form, tipo: e.target.value })}
@@ -167,7 +183,10 @@ export default function Liquidaciones() {
       </div>
 
       <div className="card p-5 mb-6">
-        <h2 className="font-medium text-slate-700 mb-3">Planilla general (todo el personal)</h2>
+        <h2 className="font-medium text-slate-700 mb-3 flex items-center gap-1.5">
+          Planilla general (todo el personal)
+          <InfoTip texto="Descarga un Excel con el resumen de horas y montos de TODO el personal para el período elegido, sin generar liquidaciones individuales. Sirve para revisar o presentar." />
+        </h2>
         <div className="flex gap-3 items-end flex-wrap">
           <div>
             <label className="block text-xs text-slate-500 mb-1">Desde</label>

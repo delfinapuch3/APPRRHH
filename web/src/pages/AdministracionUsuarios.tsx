@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, errorMessage } from "../api/client.js";
 import { useAuth } from "../auth/AuthContext.js";
+import { InfoTip } from "../components/InfoTip.js";
+import { useConfirm } from "../components/ConfirmProvider.js";
 
 interface Sector {
   id: string;
@@ -32,6 +34,7 @@ interface EdicionForm {
 export default function AdministracionUsuarios() {
   const queryClient = useQueryClient();
   const { user: actual } = useAuth();
+  const confirmar = useConfirm();
 
   const { data: usuarios, isLoading } = useQuery({
     queryKey: ["usuarios"],
@@ -72,10 +75,28 @@ export default function AdministracionUsuarios() {
     onError: (err) => alert(errorMessage(err, "No se pudo eliminar el usuario")),
   });
 
-  function confirmarEliminar(u: Usuario) {
+  async function confirmarEliminar(u: Usuario) {
     const nombre = u.apellido ? `${u.apellido}, ${u.nombre}` : u.nombre;
-    if (window.confirm(`¿Eliminar definitivamente a ${nombre} (${u.email})? Esta acción no se puede deshacer.`)) {
-      eliminar.mutate(u.id);
+    const ok = await confirmar({
+      titulo: "Eliminar usuario",
+      mensaje: `¿Eliminar definitivamente a ${nombre} (${u.email})? Esta acción no se puede deshacer. Si el usuario tiene registros asociados no se podrá borrar; en ese caso, dalo de baja.`,
+      textoConfirmar: "Eliminar",
+      peligro: true,
+    });
+    if (ok) eliminar.mutate(u.id);
+  }
+
+  async function confirmarBaja(u: Usuario) {
+    const nombre = u.apellido ? `${u.apellido}, ${u.nombre}` : u.nombre;
+    if (u.activo) {
+      const ok = await confirmar({
+        titulo: "Dar de baja",
+        mensaje: `${nombre} ya no va a poder iniciar sesión. Se conserva su historial y podés reactivarlo después. ¿Confirmás?`,
+        textoConfirmar: "Dar de baja",
+      });
+      if (ok) actualizar.mutate({ id: u.id, activo: false });
+    } else {
+      actualizar.mutate({ id: u.id, activo: true });
     }
   }
 
@@ -122,7 +143,10 @@ export default function AdministracionUsuarios() {
 
   return (
     <div>
-      <h1 className="page-header mb-6">Usuarios</h1>
+      <h1 className="page-header mb-6 flex items-center gap-2">
+        Usuarios
+        <InfoTip texto="Personas que pueden entrar al sistema. Acá creás sus accesos, definís el rol (qué pueden hacer), les reseteás la contraseña y los das de alta o baja. No confundir con los empleados/operarios." />
+      </h1>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Nuevo usuario */}
         <div className="card p-5 lg:col-span-1">
@@ -143,7 +167,10 @@ export default function AdministracionUsuarios() {
               <input required value={form.apellido} onChange={(e) => setForm({ ...form, apellido: e.target.value })} className="input" />
             </div>
             <div>
-              <label className="section-title block mb-1.5">Rol</label>
+              <label className="section-title mb-1.5 flex items-center gap-1">
+                Rol
+                <InfoTip texto="Administrador: acceso total (usuarios, liquidaciones, configuración, todos los sectores). Encargado de sector: solo ve y gestiona los sectores que le asignes abajo." />
+              </label>
               <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as "ADMIN" | "ENCARGADO" })} className="input">
                 <option value="ENCARGADO">Encargado de sector</option>
                 <option value="ADMIN">Administrador</option>
@@ -159,7 +186,10 @@ export default function AdministracionUsuarios() {
             </div>
             {form.role === "ENCARGADO" && sectores && sectores.length > 0 && (
               <div>
-                <label className="section-title block mb-1.5">Sectores</label>
+                <label className="section-title mb-1.5 flex items-center gap-1">
+                  Sectores
+                  <InfoTip texto="Los sectores que este encargado va a poder ver y gestionar. Solo aplica al rol Encargado; un Administrador ve todos." />
+                </label>
                 <div className="max-h-40 overflow-auto border border-content-border rounded-lg p-2 space-y-1">
                   {sectores.filter((s) => s.activo !== false).map((s) => (
                     <label key={s.id} className="flex items-center gap-2 text-sm text-ink-secondary">
@@ -222,7 +252,7 @@ export default function AdministracionUsuarios() {
                             Editar
                           </button>
                           {!esYo && (
-                            <button onClick={() => actualizar.mutate({ id: u.id, activo: !u.activo })} className="btn-ghost">
+                            <button onClick={() => confirmarBaja(u)} className="btn-ghost">
                               {u.activo ? "Dar de baja" : "Reactivar"}
                             </button>
                           )}
@@ -282,7 +312,10 @@ export default function AdministracionUsuarios() {
                 />
               </div>
               <div>
-                <label className="section-title block mb-1.5">Rol</label>
+                <label className="section-title mb-1.5 flex items-center gap-1">
+                Rol
+                <InfoTip texto="Administrador: acceso total (usuarios, liquidaciones, configuración, todos los sectores). Encargado de sector: solo ve y gestiona los sectores que le asignes abajo." />
+              </label>
                 <select
                   value={edit.role}
                   disabled={editando.id === actual?.id}
@@ -295,7 +328,10 @@ export default function AdministracionUsuarios() {
               </div>
               {edit.role === "ENCARGADO" && sectores && sectores.length > 0 && (
                 <div>
-                  <label className="section-title block mb-1.5">Sectores</label>
+                  <label className="section-title mb-1.5 flex items-center gap-1">
+                  Sectores
+                  <InfoTip texto="Los sectores que este encargado va a poder ver y gestionar. Solo aplica al rol Encargado; un Administrador ve todos." />
+                </label>
                   <div className="max-h-40 overflow-auto border border-content-border rounded-lg p-2 space-y-1">
                     {sectores.filter((s) => s.activo !== false).map((s) => (
                       <label key={s.id} className="flex items-center gap-2 text-sm text-ink-secondary">
