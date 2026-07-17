@@ -2,8 +2,10 @@ import { describe, it, expect } from "vitest";
 import { ajustarFichadasPorTurno, intervalsParaDia } from "./recalcular.js";
 import { toUtcDateOnly } from "../lib/dates.js";
 
+// Hora de pared en Argentina (UTC-3 fijo), sin depender del huso horario de
+// la máquina que corre los tests — misma convención que `localDateTime`.
 function d(y: number, m: number, day: number, h: number, min = 0) {
-  return new Date(y, m - 1, day, h, min, 0, 0);
+  return new Date(Date.UTC(y, m - 1, day, h + 3, min, 0, 0));
 }
 
 describe("intervalsParaDia", () => {

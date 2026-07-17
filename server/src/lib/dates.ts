@@ -3,13 +3,20 @@
  * - Un campo "fecha" (calendario, sin hora) siempre se representa como
  *   medianoche UTC (igual que produce `new Date("YYYY-MM-DD")` tanto en el
  *   navegador como en Node). Por eso SIEMPRE se lee con getters UTC
- *   (getUTCDay, getUTCFullYear, etc.), nunca con los locales: el server
- *   corre en America/Buenos_Aires (UTC-3), y usar getters locales sobre una
- *   medianoche UTC corre el día hacia atrás.
+ *   (getUTCDay, getUTCFullYear, etc.).
  * - Un campo "horaEntrada"/"horaSalida" es un instante real (con hora de
- *   reloj) y se construye con el constructor local de Date para que
- *   represente la hora de pared correcta en Argentina.
+ *   reloj) que representa la hora de pared en Argentina. Argentina no tiene
+ *   horario de verano desde 2009: UTC-3 fijo todo el año, así que ese
+ *   desplazamiento se aplica siempre a mano (`localDateTime`/`formatHHMM`),
+ *   sin depender del huso horario configurado en la máquina que corre el
+ *   código. Antes se usaba el constructor local de Date (`new
+ *   Date(y,m,d,h,mi)`) asumiendo que el proceso corría en
+ *   America/Argentina/Buenos_Aires — eso rompía silenciosamente cada vez que
+ *   el server corría en un huso distinto (ej. contenedores Docker, que por
+ *   default vienen en UTC), corriendo todas las horas importadas 3hs.
  */
+
+const OFFSET_ARGENTINA_HORAS = 3; // hora UTC = hora de Argentina + 3 (sin horario de verano)
 
 export function toUtcDateOnly(y: number, m0: number, d: number): Date {
   return new Date(Date.UTC(y, m0, d));
@@ -29,12 +36,25 @@ export function dayOfWeekUtc(date: Date): number {
   return date.getUTCDay();
 }
 
-/** Construye un instante real (hora de pared local) para el día calendario `fecha` (UTC-midnight). */
+/** Construye un instante real (hora de pared en Argentina) para el día calendario `fecha` (UTC-midnight). */
 export function localDateTime(fecha: Date, hours: number, minutes: number, seconds = 0): Date {
-  return new Date(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate(), hours, minutes, seconds, 0);
+  return new Date(
+    Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate(), hours + OFFSET_ARGENTINA_HORAS, minutes, seconds, 0)
+  );
 }
 
-/** Formatea un instante real (hora de pared local) como "HH:MM". */
+/** Formatea un instante real como "HH:MM" en hora de Argentina. */
 export function formatHHMM(instante: Date): string {
-  return `${String(instante.getHours()).padStart(2, "0")}:${String(instante.getMinutes()).padStart(2, "0")}`;
+  return instante.toLocaleTimeString("en-GB", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+/** Minutos desde medianoche, en hora de Argentina, de un instante real (0-1439). */
+export function minutosDelDiaArgentina(instante: Date): number {
+  const utcMin = instante.getUTCHours() * 60 + instante.getUTCMinutes();
+  return (((utcMin - OFFSET_ARGENTINA_HORAS * 60) % 1440) + 1440) % 1440;
 }

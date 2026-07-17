@@ -1,6 +1,6 @@
 import { prisma } from "../db.js";
 import { calcularDia, type PayrollConfigLike, type TimeInterval } from "./calculo.js";
-import { addUtcDays, dayOfWeekUtc, localDateTime, utcDateOnlyFrom } from "../lib/dates.js";
+import { addUtcDays, dayOfWeekUtc, localDateTime, minutosDelDiaArgentina, utcDateOnlyFrom } from "../lib/dates.js";
 import { SECTORES_LUNES_A_VIERNES } from "../lib/constants.js";
 
 const startOfDay = utcDateOnlyFrom;
@@ -108,9 +108,9 @@ export function ajustarFichadasPorTurno(
     const grupo = [...grupoSinOrdenar].sort((a, b) => a.horaEntrada.getTime() - b.horaEntrada.getTime());
     const diaGrupo = startOfDay(grupo[0].fecha);
     const primeraEntrada = grupo[0].horaEntrada;
-    const entradaMin = primeraEntrada.getHours() * 60 + primeraEntrada.getMinutes();
+    const entradaMin = minutosDelDiaArgentina(primeraEntrada);
     const ultimaSalidaRaw = grupo[grupo.length - 1].horaSalida;
-    const salidaMin = ultimaSalidaRaw ? ultimaSalidaRaw.getHours() * 60 + ultimaSalidaRaw.getMinutes() : null;
+    const salidaMin = ultimaSalidaRaw ? minutosDelDiaArgentina(ultimaSalidaRaw) : null;
     const turno = detectarTurno(entradaMin, salidaMin, turnos);
     if (!turno) {
       ajustadas.push(...grupo);
