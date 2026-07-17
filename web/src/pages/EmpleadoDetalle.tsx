@@ -84,7 +84,12 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 function formatHora(iso: string) {
-  return new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return new Date(iso).toLocaleTimeString("es-AR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "America/Argentina/Buenos_Aires",
+  });
 }
 
 export default function EmpleadoDetalle() {

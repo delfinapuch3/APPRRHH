@@ -29,13 +29,14 @@ interface Props {
   onSaved: () => void;
 }
 
+// Siempre en horario de Argentina, sin importar la zona horaria del
+// navegador que esté mirando la pantalla (ver bug de horarios desfasados).
+const TZ_ARGENTINA = "America/Argentina/Buenos_Aires";
 function toLocalDateStr(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return new Date(iso).toLocaleDateString("en-CA", { timeZone: TZ_ARGENTINA });
 }
 function toLocalTimeStr(iso: string): string {
-  const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return new Date(iso).toLocaleTimeString("en-GB", { timeZone: TZ_ARGENTINA, hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
 export default function FichadaEditModal({

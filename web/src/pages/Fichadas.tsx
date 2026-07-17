@@ -419,9 +419,23 @@ export default function Fichadas() {
                   {f.employee.apellido}, {f.employee.nombre}
                 </td>
                 <td className="py-2">{new Date(f.fecha).toLocaleDateString("es-AR", { timeZone: "UTC" })}</td>
-                <td className="py-2">{new Date(f.horaEntrada).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false })}</td>
                 <td className="py-2">
-                  {f.horaSalida ? new Date(f.horaSalida).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }) : "-"}
+                  {new Date(f.horaEntrada).toLocaleTimeString("es-AR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: false,
+                    timeZone: "America/Argentina/Buenos_Aires",
+                  })}
+                </td>
+                <td className="py-2">
+                  {f.horaSalida
+                    ? new Date(f.horaSalida).toLocaleTimeString("es-AR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false,
+                        timeZone: "America/Argentina/Buenos_Aires",
+                      })
+                    : "-"}
                 </td>
                 <td className="py-2">{f.origen}</td>
               </tr>
