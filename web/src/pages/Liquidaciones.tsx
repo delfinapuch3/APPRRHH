@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../api/client.js";
+import { api, errorMessage } from "../api/client.js";
 import { InfoTip } from "../components/InfoTip.js";
 import { useConfirm } from "../components/ConfirmProvider.js";
 
@@ -68,6 +68,23 @@ export default function Liquidaciones() {
       }
     },
   });
+
+  const eliminar = useMutation({
+    mutationFn: async (id: string) => api.delete(`/liquidaciones/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["liquidaciones"] }),
+    onError: (err) => alert(errorMessage(err, "No se pudo eliminar la liquidación")),
+  });
+
+  async function confirmarEliminar(l: Liquidacion) {
+    const periodo = `${new Date(l.fechaDesde).toLocaleDateString("es-AR", { timeZone: "UTC" })} - ${new Date(l.fechaHasta).toLocaleDateString("es-AR", { timeZone: "UTC" })}`;
+    const ok = await confirmar({
+      titulo: "Eliminar liquidación",
+      mensaje: `¿Eliminar la liquidación de ${l.employee.apellido}, ${l.employee.nombre} (${l.tipo.toLowerCase()}, ${periodo})? Esta acción no se puede deshacer.`,
+      textoConfirmar: "Eliminar",
+      peligro: true,
+    });
+    if (ok) eliminar.mutate(l.id);
+  }
 
   async function onGenerar(e: React.FormEvent) {
     e.preventDefault();
@@ -253,6 +270,9 @@ export default function Liquidaciones() {
                   <td className="py-2 text-right">
                     <button onClick={() => exportar(l.id)} className="text-slate-700 underline text-sm">
                       Exportar
+                    </button>
+                    <button onClick={() => confirmarEliminar(l)} className="text-red-600 underline text-sm ml-3">
+                      Eliminar
                     </button>
                   </td>
                 </tr>
