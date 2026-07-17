@@ -12,6 +12,13 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+interface FaltaSinClasificar {
+  id: string;
+  employeeId: string;
+  employee: { legajo: string; nombre: string; apellido: string };
+  fecha: string;
+}
+
 export default function AsistenciaPeriodo() {
   const queryClient = useQueryClient();
   const [desde, setDesde] = useState(firstOfMonth());
@@ -28,7 +35,7 @@ export default function AsistenciaPeriodo() {
 
   const { data: faltas } = useQuery({
     queryKey: ["faltas-sin-clasificar", desde, hasta],
-    queryFn: async () => (await api.get(`/asistencia/faltas-sin-clasificar?desde=${desde}&hasta=${hasta}`)).data as any[],
+    queryFn: async () => (await api.get(`/asistencia/faltas-sin-clasificar?desde=${desde}&hasta=${hasta}`)).data as FaltaSinClasificar[],
   });
 
   const clasificar = useMutation({

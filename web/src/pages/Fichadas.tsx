@@ -18,6 +18,15 @@ interface PreviewResult {
   totalRows: number;
 }
 
+interface Fichada {
+  id: string;
+  employee: { legajo: string; nombre: string; apellido: string };
+  fecha: string;
+  horaEntrada: string;
+  horaSalida: string | null;
+  origen: string;
+}
+
 export default function Fichadas() {
   const queryClient = useQueryClient();
   const { data: empleados } = useQuery({
@@ -26,7 +35,7 @@ export default function Fichadas() {
   });
   const { data: fichadas } = useQuery({
     queryKey: ["fichadas-recientes"],
-    queryFn: async () => (await api.get("/fichadas")).data as any[],
+    queryFn: async () => (await api.get("/fichadas")).data as Fichada[],
   });
 
   // --- import ---

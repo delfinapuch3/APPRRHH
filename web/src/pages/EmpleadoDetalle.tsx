@@ -7,6 +7,22 @@ import { TIPOS_AUSENCIA, labelTipoAusencia } from "../lib/tiposAusencia.js";
 import FichadaEditModal from "../components/FichadaEditModal.js";
 import { invalidarAsistenciaRelacionada } from "../lib/invalidarAsistencia.js";
 
+interface AusenciaItem {
+  id: string;
+  tipo: string;
+  fechaDesde: string;
+  fechaHasta: string;
+  justificada: boolean;
+  observaciones: string | null;
+}
+
+interface FrancoItem {
+  id: string;
+  estado: string;
+  fechaGenerado: string;
+  horas: number;
+}
+
 interface Empleado {
   id: string;
   legajo: string;
@@ -101,7 +117,7 @@ export default function EmpleadoDetalle() {
   });
   const { data: ausencias } = useQuery({
     queryKey: ["ausencias", id],
-    queryFn: async () => (await api.get(`/ausencias?employeeId=${id}`)).data as any[],
+    queryFn: async () => (await api.get(`/ausencias?employeeId=${id}`)).data as AusenciaItem[],
     enabled: tab === "ausencias",
   });
   const { data: vacaciones } = useQuery({
@@ -111,7 +127,7 @@ export default function EmpleadoDetalle() {
   });
   const { data: francos } = useQuery({
     queryKey: ["francos", id],
-    queryFn: async () => (await api.get(`/francos?employeeId=${id}`)).data as any[],
+    queryFn: async () => (await api.get(`/francos?employeeId=${id}`)).data as FrancoItem[],
     enabled: tab === "francos",
   });
 
