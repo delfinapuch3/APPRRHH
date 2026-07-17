@@ -1,23 +1,11 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
 import { sectorScope } from "../middleware/auth.js";
-import { recalcularSectorPeriodo } from "../engine/recalcular.js";
+import { recalcularSectorPeriodoCacheado } from "../lib/recalcCache.js";
 import { utcDateOnlyFrom } from "../lib/dates.js";
 import { SECTORES_LUNES_A_VIERNES } from "../lib/constants.js";
 
 const router = Router();
-
-// Cache del recálculo del analítico: el recálculo del mes entero es caro y no
-// hace falta repetirlo en cada carga (las mutaciones ya mantienen los datos al
-// día). Se corre a lo sumo una vez cada RECALC_TTL_MS por clave de período.
-const RECALC_TTL_MS = 90_000; // 90 s
-const ultimoRecalc = new Map<string, number>();
-async function recalcularConCache(clave: string, fn: () => Promise<void>): Promise<void> {
-  const ahora = Date.now();
-  if (ahora - (ultimoRecalc.get(clave) ?? 0) < RECALC_TTL_MS) return;
-  await fn();
-  ultimoRecalc.set(clave, ahora);
-}
 
 const MS_POR_ANIO = 365.25 * 86_400_000;
 function edadEnAnios(desde: Date, hasta: Date): number {
@@ -40,15 +28,12 @@ router.get("/resumen", async (req, res) => {
   const hoy = utcDateOnlyFrom(new Date());
   const desde = utcDateOnlyFrom(new Date(hoy.getUTCFullYear(), hoy.getUTCMonth(), 1));
 
-  const claveRecalc = `resumen:${scope ? [...scope].sort().join(",") : "all"}:${desde.getTime()}`;
-  await recalcularConCache(claveRecalc, async () => {
-    if (scope === null) {
-      await recalcularSectorPeriodo(null, desde, hoy);
-    } else {
-      const sectorIds = new Set(empleados.map((e) => e.sectorId).filter((x): x is string => !!x));
-      for (const sid of sectorIds) await recalcularSectorPeriodo(sid, desde, hoy);
-    }
-  });
+  if (scope === null) {
+    await recalcularSectorPeriodoCacheado(null, desde, hoy);
+  } else {
+    const sectorIds = new Set(empleados.map((e) => e.sectorId).filter((x): x is string => !!x));
+    for (const sid of sectorIds) await recalcularSectorPeriodoCacheado(sid, desde, hoy);
+  }
 
   const [calculos, tardanzasManuales] = await Promise.all([
     prisma.dailyCalculation.findMany({ where: { employeeId: { in: empleadoIds }, fecha: { gte: desde, lte: hoy } } }),
@@ -116,14 +101,11 @@ router.get("/ausentismo-por-mes", async (req, res) => {
 
   const resultado = [];
   for (const mes of meses) {
-    const claveMes = `mes:${scope ? [...scope].sort().join(",") : "all"}:${mes.desde.getTime()}`;
-    await recalcularConCache(claveMes, async () => {
-      if (scope === null) {
-        await recalcularSectorPeriodo(null, mes.desde, mes.hasta);
-      } else if (sectorIds) {
-        for (const sid of sectorIds) await recalcularSectorPeriodo(sid, mes.desde, mes.hasta);
-      }
-    });
+    if (scope === null) {
+      await recalcularSectorPeriodoCacheado(null, mes.desde, mes.hasta);
+    } else if (sectorIds) {
+      for (const sid of sectorIds) await recalcularSectorPeriodoCacheado(sid, mes.desde, mes.hasta);
+    }
     const calculos = await prisma.dailyCalculation.findMany({
       where: { employeeId: { in: empleadoIds }, fecha: { gte: mes.desde, lte: mes.hasta } },
     });

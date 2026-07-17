@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
 import { sectorScope } from "../middleware/auth.js";
-import { recalcularSectorPeriodo } from "../engine/recalcular.js";
+import { recalcularSectorPeriodoCacheado } from "../lib/recalcCache.js";
 import { addUtcDays, utcDateOnlyFrom } from "../lib/dates.js";
 import { SECTORES_LUNES_A_VIERNES } from "../lib/constants.js";
 
@@ -43,10 +43,10 @@ router.get("/resumen-hoy", async (req, res) => {
   const empleadoIds = empleados.map((e) => e.id);
 
   if (scope === null && !empresaId && !sectorId) {
-    await recalcularSectorPeriodo(null, hoy, hoy);
+    await recalcularSectorPeriodoCacheado(null, hoy, hoy);
   } else {
     for (const sid of new Set(empleados.map((e) => e.sectorId).filter((x): x is string => !!x))) {
-      await recalcularSectorPeriodo(sid, hoy, hoy);
+      await recalcularSectorPeriodoCacheado(sid, hoy, hoy);
     }
   }
 
@@ -92,10 +92,10 @@ router.get("/detalle-hoy", async (req, res) => {
   const empleadoIds = empleados.map((e) => e.id);
 
   if (scope === null && !empresaId && !sectorId) {
-    await recalcularSectorPeriodo(null, hoy, hoy);
+    await recalcularSectorPeriodoCacheado(null, hoy, hoy);
   } else {
     for (const sid of new Set(empleados.map((e) => e.sectorId).filter((x): x is string => !!x))) {
-      await recalcularSectorPeriodo(sid, hoy, hoy);
+      await recalcularSectorPeriodoCacheado(sid, hoy, hoy);
     }
   }
 
@@ -139,10 +139,10 @@ router.get("/top-ausencias", async (req, res) => {
   const empleadoIds = empleados.map((e) => e.id);
 
   if (scope === null && !empresaId && !sectorId) {
-    await recalcularSectorPeriodo(null, desde, hasta);
+    await recalcularSectorPeriodoCacheado(null, desde, hasta);
   } else {
     for (const sid of new Set(empleados.map((e) => e.sectorId).filter((x): x is string => !!x))) {
-      await recalcularSectorPeriodo(sid, desde, hasta);
+      await recalcularSectorPeriodoCacheado(sid, desde, hasta);
     }
   }
 
@@ -173,10 +173,10 @@ router.get("/top-tardanzas", async (req, res) => {
   const empleadoIds = empleados.map((e) => e.id);
 
   if (scope === null && !empresaId && !sectorId) {
-    await recalcularSectorPeriodo(null, desde, hasta);
+    await recalcularSectorPeriodoCacheado(null, desde, hasta);
   } else {
     for (const sid of new Set(empleados.map((e) => e.sectorId).filter((x): x is string => !!x))) {
-      await recalcularSectorPeriodo(sid, desde, hasta);
+      await recalcularSectorPeriodoCacheado(sid, desde, hasta);
     }
   }
 
@@ -233,7 +233,7 @@ router.get("/horas-por-sector", async (req, res) => {
 
   const resultado = [];
   for (const [sectorId, emps] of porSector) {
-    await recalcularSectorPeriodo(sectorId, desde, hasta);
+    await recalcularSectorPeriodoCacheado(sectorId, desde, hasta);
     const empleadoIds = emps.map((e) => e.id);
     const calculos = await prisma.dailyCalculation.findMany({
       where: { employeeId: { in: empleadoIds }, fecha: { gte: desde, lte: hasta } },
@@ -271,7 +271,7 @@ router.get("/horas-extra-por-sector", async (req, res) => {
 
   const resultado = [];
   for (const [sectorId, emps] of porSector) {
-    await recalcularSectorPeriodo(sectorId, desde, hasta);
+    await recalcularSectorPeriodoCacheado(sectorId, desde, hasta);
     const empleadoIds = emps.map((e) => e.id);
     const valorHoraPorEmpleado = new Map(
       (await prisma.employee.findMany({ where: { id: { in: empleadoIds } }, select: { id: true, valorHoraNormal: true } })).map((e) => [
@@ -323,7 +323,7 @@ router.get("/detalle-sector", async (req, res) => {
   });
   const empleadoIds = empleados.map((e) => e.id);
 
-  await recalcularSectorPeriodo(sectorId, desde, hasta);
+  await recalcularSectorPeriodoCacheado(sectorId, desde, hasta);
   const [calculos, config] = await Promise.all([
     prisma.dailyCalculation.findMany({ where: { employeeId: { in: empleadoIds }, fecha: { gte: desde, lte: hasta } } }),
     prisma.payrollConfig.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } }),
