@@ -230,15 +230,28 @@ router.post("/confirm", async (req, res) => {
     }
   }
 
-  // Evita duplicar fichadas que ya están cargadas (mismo empleado, día,
-  // entrada y salida): pasa cuando se vuelve a subir el mismo archivo, o uno
-  // que se superpone con fechas ya importadas. Sin esto, cada re-importación
-  // sumaba el mismo turno de nuevo y las horas quedaban multiplicadas.
-  let nuevos = created;
-  let duplicados = 0;
-  if (created.length > 0) {
-    const employeeIds = [...new Set(created.map((c) => c.employeeId))];
-    const fechas = created.map((c) => c.fecha.getTime());
+  // Evita duplicar fichadas (mismo empleado, día, entrada y salida), tanto
+  // las que ya están guardadas en la base (re-importar el mismo archivo, o
+  // uno que se superpone con fechas ya cargadas) como las que vienen
+  // repetidas dentro del propio archivo que se está subiendo ahora (ej. una
+  // celda de marcaciones que trae el mismo par entrada-salida dos veces).
+  // Sin esto, cada repetición sumaba el mismo turno de nuevo y las horas
+  // quedaban multiplicadas.
+  const firma = (r: { employeeId: string; fecha: Date; horaEntrada: Date; horaSalida: Date | null }) =>
+    `${r.employeeId}|${r.fecha.getTime()}|${r.horaEntrada.getTime()}|${r.horaSalida?.getTime() ?? "null"}`;
+
+  const firmasVistas = new Set<string>();
+  const sinRepetirEnArchivo = created.filter((c) => {
+    const f = firma(c);
+    if (firmasVistas.has(f)) return false;
+    firmasVistas.add(f);
+    return true;
+  });
+
+  let nuevos = sinRepetirEnArchivo;
+  if (sinRepetirEnArchivo.length > 0) {
+    const employeeIds = [...new Set(sinRepetirEnArchivo.map((c) => c.employeeId))];
+    const fechas = sinRepetirEnArchivo.map((c) => c.fecha.getTime());
     const existentes = await prisma.timeRecord.findMany({
       where: {
         employeeId: { in: employeeIds },
@@ -246,13 +259,11 @@ router.post("/confirm", async (req, res) => {
       },
       select: { employeeId: true, fecha: true, horaEntrada: true, horaSalida: true },
     });
-    const firma = (r: { employeeId: string; fecha: Date; horaEntrada: Date; horaSalida: Date | null }) =>
-      `${r.employeeId}|${r.fecha.getTime()}|${r.horaEntrada.getTime()}|${r.horaSalida?.getTime() ?? "null"}`;
     const firmasExistentes = new Set(existentes.map(firma));
-    nuevos = created.filter((c) => !firmasExistentes.has(firma(c)));
-    duplicados = created.length - nuevos.length;
+    nuevos = sinRepetirEnArchivo.filter((c) => !firmasExistentes.has(firma(c)));
   }
   const insertados = nuevos.length;
+  const duplicados = created.length - insertados;
 
   const batch = await prisma.importBatch.create({
     data: {
