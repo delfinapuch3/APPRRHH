@@ -121,7 +121,6 @@ router.post("/confirm", async (req, res) => {
 
   const errores: string[] = [];
   const registrosPorEmpleado = new Map<string, { min: Date; max: Date }>();
-  let insertados = 0;
   const created: { employeeId: string; fecha: Date; horaEntrada: Date; horaSalida: Date | null }[] = [];
 
   function marcarRango(employeeId: string, fecha: Date) {
@@ -210,7 +209,6 @@ router.post("/confirm", async (req, res) => {
           horaEntrada: horaStringToDate(turno.fecha, turno.entradaStr),
           horaSalida: turno.salidaStr ? horaStringToDate(turno.fechaSalida, turno.salidaStr) : null,
         });
-        insertados += 1;
         marcarRango(employeeId, turno.fecha);
         if (turno.fechaSalida.getTime() !== turno.fecha.getTime()) marcarRango(employeeId, turno.fechaSalida);
       }
@@ -229,9 +227,32 @@ router.post("/confirm", async (req, res) => {
       const horaSalida = mapping.horaSalida ? combineFechaHora(f.fecha, f.row[mapping.horaSalida]) : null;
       created.push({ employeeId: f.employeeId, fecha: f.fecha, horaEntrada, horaSalida });
       marcarRango(f.employeeId, f.fecha);
-      insertados += 1;
     }
   }
+
+  // Evita duplicar fichadas que ya están cargadas (mismo empleado, día,
+  // entrada y salida): pasa cuando se vuelve a subir el mismo archivo, o uno
+  // que se superpone con fechas ya importadas. Sin esto, cada re-importación
+  // sumaba el mismo turno de nuevo y las horas quedaban multiplicadas.
+  let nuevos = created;
+  let duplicados = 0;
+  if (created.length > 0) {
+    const employeeIds = [...new Set(created.map((c) => c.employeeId))];
+    const fechas = created.map((c) => c.fecha.getTime());
+    const existentes = await prisma.timeRecord.findMany({
+      where: {
+        employeeId: { in: employeeIds },
+        fecha: { gte: new Date(Math.min(...fechas)), lte: new Date(Math.max(...fechas)) },
+      },
+      select: { employeeId: true, fecha: true, horaEntrada: true, horaSalida: true },
+    });
+    const firma = (r: { employeeId: string; fecha: Date; horaEntrada: Date; horaSalida: Date | null }) =>
+      `${r.employeeId}|${r.fecha.getTime()}|${r.horaEntrada.getTime()}|${r.horaSalida?.getTime() ?? "null"}`;
+    const firmasExistentes = new Set(existentes.map(firma));
+    nuevos = created.filter((c) => !firmasExistentes.has(firma(c)));
+    duplicados = created.length - nuevos.length;
+  }
+  const insertados = nuevos.length;
 
   const batch = await prisma.importBatch.create({
     data: {
@@ -243,9 +264,9 @@ router.post("/confirm", async (req, res) => {
     },
   });
 
-  if (created.length > 0) {
+  if (nuevos.length > 0) {
     await prisma.timeRecord.createMany({
-      data: created.map((c) => ({ ...c, origen: "IMPORTADO" as const, importBatchId: batch.id })),
+      data: nuevos.map((c) => ({ ...c, origen: "IMPORTADO" as const, importBatchId: batch.id })),
     });
   }
 
@@ -254,7 +275,7 @@ router.post("/confirm", async (req, res) => {
   }
 
   cache.delete(token);
-  res.json({ batchId: batch.id, insertados, errores });
+  res.json({ batchId: batch.id, insertados, duplicados, errores });
 });
 
 export default router;
