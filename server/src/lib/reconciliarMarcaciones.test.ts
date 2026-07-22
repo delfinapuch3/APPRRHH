@@ -89,4 +89,27 @@ describe("reconciliarMarcaciones", () => {
       { fecha: dia(2026, 6, 1), entradaStr: "13:00", salidaStr: "17:00", fechaSalida: dia(2026, 6, 1) },
     ]);
   });
+
+  it("caso ROSSI: salida y vuelta del almuerzo con 12min de diferencia se toman como dos tramos reales", () => {
+    const { turnos } = reconciliarMarcaciones([{ fecha: dia(2026, 7, 6), raw: "E 08:05 - S 12:50  E 13:02 - S 16:02" }]);
+    expect(turnos).toEqual([
+      { fecha: dia(2026, 7, 6), entradaStr: "08:05", salidaStr: "12:50", fechaSalida: dia(2026, 7, 6) },
+      { fecha: dia(2026, 7, 6), entradaStr: "13:02", salidaStr: "16:02", fechaSalida: dia(2026, 7, 6) },
+    ]);
+  });
+
+  it("marcación fantasma (≤5min de la anterior) se descarta, quedando un turno normal", () => {
+    const { turnos } = reconciliarMarcaciones([{ fecha: dia(2026, 6, 1), raw: "E 08:00 - E 08:03 - S 16:00" }]);
+    expect(turnos).toEqual([{ fecha: dia(2026, 6, 1), entradaStr: "08:00", salidaStr: "16:00", fechaSalida: dia(2026, 6, 1) }]);
+  });
+
+  it("marcación fantasma pegada a la salida también se descarta", () => {
+    const { turnos } = reconciliarMarcaciones([{ fecha: dia(2026, 6, 1), raw: "E 08:00 - S 16:00 - S 16:02" }]);
+    expect(turnos).toEqual([{ fecha: dia(2026, 6, 1), entradaStr: "08:00", salidaStr: "16:00", fechaSalida: dia(2026, 6, 1) }]);
+  });
+
+  it("caso AGOSTA: marca intermedia sin pareja (cantidad impar) colapsa a un solo tramo primera-entrada/última-marca", () => {
+    const { turnos } = reconciliarMarcaciones([{ fecha: dia(2026, 7, 17), raw: "E 07:59 - S 15:43 E 16:01" }]);
+    expect(turnos).toEqual([{ fecha: dia(2026, 7, 17), entradaStr: "07:59", salidaStr: "16:01", fechaSalida: dia(2026, 7, 17) }]);
+  });
 });

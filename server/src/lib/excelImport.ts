@@ -118,6 +118,29 @@ export function tokenizeMarcaciones(value: string): TokenMarcacion[] {
   }));
 }
 
+const UMBRAL_MARCACION_FANTASMA_MINUTOS = 5;
+
+/**
+ * Descarta marcaciones "fantasma": el reloj biométrico a veces registra la
+ * misma marca dos veces (el sensor lee la cara/huella de nuevo por error). Se
+ * asume fantasma cuando cae a 5 minutos o menos de la marca anterior, y se
+ * conserva solo la primera de cada grupo así detectado.
+ */
+export function filtrarMarcacionesFantasma(tokens: TokenMarcacion[]): TokenMarcacion[] {
+  const result: TokenMarcacion[] = [];
+  for (const t of tokens) {
+    const anterior = result[result.length - 1];
+    if (anterior) {
+      const [h1, m1] = anterior.hora.split(":").map(Number);
+      const [h2, m2] = t.hora.split(":").map(Number);
+      const diffMin = Math.abs(h2 * 60 + m2 - (h1 * 60 + m1));
+      if (diffMin <= UMBRAL_MARCACION_FANTASMA_MINUTOS) continue;
+    }
+    result.push(t);
+  }
+  return result;
+}
+
 /**
  * Empareja una secuencia de tokens en tramos entrada/salida por POSICIÓN
  * (0=entrada,1=salida,2=entrada,...), ignorando la letra E/S que trae cada
@@ -198,7 +221,7 @@ export function reconciliarMarcaciones(
   }
 
   for (const dia of dias) {
-    let tokens = tokenizeMarcaciones(dia.raw);
+    let tokens = filtrarMarcacionesFantasma(tokenizeMarcaciones(dia.raw));
 
     if (pendiente) {
       if (tokens.length === 0) {
@@ -217,12 +240,24 @@ export function reconciliarMarcaciones(
       }
     }
 
-    const pares = pairTokens(tokens);
-    for (const par of pares) {
-      if (par.salidaStr) {
-        turnos.push({ fecha: dia.fecha, entradaStr: par.entradaStr, salidaStr: par.salidaStr, fechaSalida: dia.fecha });
-      } else {
-        pendiente = { fecha: dia.fecha, entradaStr: par.entradaStr };
+    if (tokens.length === 1) {
+      // Una sola marca suelta: puede ser un turno que sigue abierto (todavía
+      // no se fue) o el arranque de un turno nocturno a cerrar con el día
+      // siguiente. Se deja pendiente, como siempre.
+      pendiente = { fecha: dia.fecha, entradaStr: tokens[0].hora };
+    } else if (tokens.length > 1 && tokens.length % 2 === 1) {
+      // Cantidad impar (más de una marca): la última quedó colgada sin su
+      // salida. En vez de partir el resto en tramos que no cierran bien, se
+      // toma como el cierre de todo el día completo (primera entrada del día
+      // hasta esa última marca) y se deja que la detección de turno/margen
+      // de tolerancia valide el resultado, igual que con cualquier otro par.
+      turnos.push({ fecha: dia.fecha, entradaStr: tokens[0].hora, salidaStr: tokens[tokens.length - 1].hora, fechaSalida: dia.fecha });
+    } else {
+      const pares = pairTokens(tokens);
+      for (const par of pares) {
+        if (par.salidaStr) {
+          turnos.push({ fecha: dia.fecha, entradaStr: par.entradaStr, salidaStr: par.salidaStr, fechaSalida: dia.fecha });
+        }
       }
     }
   }
