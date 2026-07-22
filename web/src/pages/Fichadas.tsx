@@ -51,7 +51,7 @@ export default function Fichadas() {
     horaSalida: "",
     marcaciones: "",
   });
-  const [importResult, setImportResult] = useState<{ insertados: number; duplicados: number; errores: string[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ insertados: number; reemplazados: number; errores: string[] } | null>(null);
 
   function guessMapping(headers: string[]) {
     const guess = (needle: string) => headers.find((h) => h.toLowerCase().includes(needle)) ?? "";
@@ -92,7 +92,7 @@ export default function Fichadas() {
     mutationFn: async () =>
       (await api.post("/fichadas/import/confirm", { token: preview!.token, sheet: preview!.sheet, mapping })).data as {
         insertados: number;
-        duplicados: number;
+        reemplazados: number;
         errores: string[];
       },
     onSuccess: (data) => {
@@ -306,8 +306,10 @@ export default function Fichadas() {
           {importResult && (
             <div className="mt-4 text-sm">
               <p className="text-primary-dark">{importResult.insertados} fichadas importadas.</p>
-              {importResult.duplicados > 0 && (
-                <p className="text-slate-500">{importResult.duplicados} ya estaban cargadas, se omitieron.</p>
+              {importResult.reemplazados > 0 && (
+                <p className="text-slate-500">
+                  {importResult.reemplazados} fichadas de días ya cargados se actualizaron con los datos nuevos del archivo.
+                </p>
               )}
               {importResult.errores.length > 0 && (
                 <details className="mt-2">

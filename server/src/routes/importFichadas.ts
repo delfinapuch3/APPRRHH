@@ -230,13 +230,10 @@ router.post("/confirm", async (req, res) => {
     }
   }
 
-  // Evita duplicar fichadas (mismo empleado, día, entrada y salida), tanto
-  // las que ya están guardadas en la base (re-importar el mismo archivo, o
-  // uno que se superpone con fechas ya cargadas) como las que vienen
-  // repetidas dentro del propio archivo que se está subiendo ahora (ej. una
-  // celda de marcaciones que trae el mismo par entrada-salida dos veces).
-  // Sin esto, cada repetición sumaba el mismo turno de nuevo y las horas
-  // quedaban multiplicadas.
+  // Descarta filas repetidas dentro del propio archivo que se está subiendo
+  // ahora (ej. una celda de marcaciones que trae el mismo par entrada-salida
+  // dos veces): sin esto, una sola importación podía sumar el mismo turno dos
+  // veces.
   const firma = (r: { employeeId: string; fecha: Date; horaEntrada: Date; horaSalida: Date | null }) =>
     `${r.employeeId}|${r.fecha.getTime()}|${r.horaEntrada.getTime()}|${r.horaSalida?.getTime() ?? "null"}`;
 
@@ -248,22 +245,27 @@ router.post("/confirm", async (req, res) => {
     return true;
   });
 
-  let nuevos = sinRepetirEnArchivo;
-  if (sinRepetirEnArchivo.length > 0) {
-    const employeeIds = [...new Set(sinRepetirEnArchivo.map((c) => c.employeeId))];
-    const fechas = sinRepetirEnArchivo.map((c) => c.fecha.getTime());
-    const existentes = await prisma.timeRecord.findMany({
-      where: {
-        employeeId: { in: employeeIds },
-        fecha: { gte: new Date(Math.min(...fechas)), lte: new Date(Math.max(...fechas)) },
-      },
-      select: { employeeId: true, fecha: true, horaEntrada: true, horaSalida: true },
-    });
-    const firmasExistentes = new Set(existentes.map(firma));
-    nuevos = sinRepetirEnArchivo.filter((c) => !firmasExistentes.has(firma(c)));
+  // Antes de insertar, se borran las fichadas IMPORTADAS previas de los
+  // mismos (empleado, día) que trae este archivo: el archivo nuevo es la
+  // fuente de verdad para esos días. Esto cubre tanto re-subir el mismo
+  // archivo (se borra y se vuelve a cargar igual, sin duplicar) como el caso
+  // de que cambió el formato de exportación del reloj (ej. ahora se ven los
+  // cortes de almuerzo que antes no estaban): la marcación vieja de todo el
+  // día se reemplaza por los tramos nuevos, en vez de quedar superpuesta con
+  // ellos. Las fichadas cargadas a mano (origen MANUAL) nunca se tocan acá.
+  const diasPorEmpleado = new Map<string, Set<number>>();
+  for (const c of sinRepetirEnArchivo) {
+    if (!diasPorEmpleado.has(c.employeeId)) diasPorEmpleado.set(c.employeeId, new Set());
+    diasPorEmpleado.get(c.employeeId)!.add(c.fecha.getTime());
   }
-  const insertados = nuevos.length;
-  const duplicados = created.length - insertados;
+  let reemplazados = 0;
+  for (const [employeeId, fechasSet] of diasPorEmpleado) {
+    const { count } = await prisma.timeRecord.deleteMany({
+      where: { employeeId, origen: "IMPORTADO", fecha: { in: [...fechasSet].map((t) => new Date(t)) } },
+    });
+    reemplazados += count;
+  }
+  const insertados = sinRepetirEnArchivo.length;
 
   const batch = await prisma.importBatch.create({
     data: {
@@ -275,9 +277,9 @@ router.post("/confirm", async (req, res) => {
     },
   });
 
-  if (nuevos.length > 0) {
+  if (sinRepetirEnArchivo.length > 0) {
     await prisma.timeRecord.createMany({
-      data: nuevos.map((c) => ({ ...c, origen: "IMPORTADO" as const, importBatchId: batch.id })),
+      data: sinRepetirEnArchivo.map((c) => ({ ...c, origen: "IMPORTADO" as const, importBatchId: batch.id })),
     });
   }
 
@@ -286,7 +288,7 @@ router.post("/confirm", async (req, res) => {
   }
 
   cache.delete(token);
-  res.json({ batchId: batch.id, insertados, duplicados, errores });
+  res.json({ batchId: batch.id, insertados, reemplazados, errores });
 });
 
 export default router;
