@@ -185,6 +185,7 @@ export interface AvisoReconciliacion {
 
 const MIN_HORAS_TURNO_CRUCE = 2;
 const MAX_HORAS_TURNO_CRUCE = 14;
+const UMBRAL_REINGRESO_RAPIDO_MINUTOS = 30;
 
 /**
  * Reconstruye los turnos de un empleado a partir de sus celdas de
@@ -247,11 +248,28 @@ export function reconciliarMarcaciones(
       pendiente = { fecha: dia.fecha, entradaStr: tokens[0].hora };
     } else if (tokens.length > 1 && tokens.length % 2 === 1) {
       // Cantidad impar (más de una marca): la última quedó colgada sin su
-      // salida. En vez de partir el resto en tramos que no cierran bien, se
-      // toma como el cierre de todo el día completo (primera entrada del día
-      // hasta esa última marca) y se deja que la detección de turno/margen
-      // de tolerancia valide el resultado, igual que con cualquier otro par.
-      turnos.push({ fecha: dia.fecha, entradaStr: tokens[0].hora, salidaStr: tokens[tokens.length - 1].hora, fechaSalida: dia.fecha });
+      // salida. Si volvió a marcar poco después de su última salida (≤30
+      // min: reingreso rápido, típico de un glitch del lector o un trámite
+      // breve), se extiende ese último tramo hasta esta marca en vez de
+      // dejarla suelta. Si el hueco es grande (horas), es un turno realmente
+      // distinto que todavía no cerró: se deja pendiente, como siempre, sin
+      // tocar los tramos completos ya formados.
+      const dangling = tokens[tokens.length - 1];
+      const ultimaSalidaCompleta = tokens[tokens.length - 2];
+      const pares = pairTokens(tokens.slice(0, -1));
+      const [h1, m1] = ultimaSalidaCompleta.hora.split(":").map(Number);
+      const [h2, m2] = dangling.hora.split(":").map(Number);
+      const gapMinutos = Math.abs(h2 * 60 + m2 - (h1 * 60 + m1));
+      if (gapMinutos <= UMBRAL_REINGRESO_RAPIDO_MINUTOS) {
+        pares[pares.length - 1] = { ...pares[pares.length - 1], salidaStr: dangling.hora };
+      } else {
+        pendiente = { fecha: dia.fecha, entradaStr: dangling.hora };
+      }
+      for (const par of pares) {
+        if (par.salidaStr) {
+          turnos.push({ fecha: dia.fecha, entradaStr: par.entradaStr, salidaStr: par.salidaStr, fechaSalida: dia.fecha });
+        }
+      }
     } else {
       const pares = pairTokens(tokens);
       for (const par of pares) {

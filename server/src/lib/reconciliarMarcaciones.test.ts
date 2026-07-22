@@ -108,8 +108,28 @@ describe("reconciliarMarcaciones", () => {
     expect(turnos).toEqual([{ fecha: dia(2026, 6, 1), entradaStr: "08:00", salidaStr: "16:00", fechaSalida: dia(2026, 6, 1) }]);
   });
 
-  it("caso AGOSTA: marca intermedia sin pareja (cantidad impar) colapsa a un solo tramo primera-entrada/última-marca", () => {
+  it("caso AGOSTA: entrada colgada a 18min de la última salida se funde con ese tramo (reingreso rápido)", () => {
     const { turnos } = reconciliarMarcaciones([{ fecha: dia(2026, 7, 17), raw: "E 07:59 - S 15:43 E 16:01" }]);
     expect(turnos).toEqual([{ fecha: dia(2026, 7, 17), entradaStr: "07:59", salidaStr: "16:01", fechaSalida: dia(2026, 7, 17) }]);
+  });
+
+  it("caso PC_204: entrada colgada a varias horas de la última salida es un turno realmente distinto, no se funde", () => {
+    const { turnos, avisos } = reconciliarMarcaciones([{ fecha: dia(2026, 7, 11), raw: "E 11:50 - S 16:25 E 19:34" }]);
+    // el tramo de la mañana queda intacto, y la entrada de la tarde/noche queda pendiente de cierre
+    expect(turnos).toEqual([
+      { fecha: dia(2026, 7, 11), entradaStr: "11:50", salidaStr: "16:25", fechaSalida: dia(2026, 7, 11) },
+      { fecha: dia(2026, 7, 11), entradaStr: "19:34", salidaStr: null, fechaSalida: dia(2026, 7, 11) },
+    ]);
+    expect(avisos).toHaveLength(1);
+  });
+
+  it("entrada colgada tras un almuerzo con reingreso rápido después: solo se funde el último tramo, el almuerzo queda intacto", () => {
+    const { turnos } = reconciliarMarcaciones([
+      { fecha: dia(2026, 7, 1), raw: "E 08:00 - S 12:00 E 13:00 - S 17:00 E 17:10" },
+    ]);
+    expect(turnos).toEqual([
+      { fecha: dia(2026, 7, 1), entradaStr: "08:00", salidaStr: "12:00", fechaSalida: dia(2026, 7, 1) },
+      { fecha: dia(2026, 7, 1), entradaStr: "13:00", salidaStr: "17:10", fechaSalida: dia(2026, 7, 1) },
+    ]);
   });
 });
