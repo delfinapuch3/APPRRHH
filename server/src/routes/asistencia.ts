@@ -214,15 +214,20 @@ router.put("/validar", requireAdmin, async (req, res) => {
 const horasManualSchema = z.object({
   employeeId: z.string().min(1),
   fecha: z.coerce.date(),
-  horasTrabajadas: z.number().min(0).max(24).nullable(),
+  // horasNormales: null pide restablecer al cálculo automático (se ignoran
+  // horasExtra50/100 en ese caso). Si no es null, las tres reemplazan al
+  // cálculo automático tal cual, cada una por separado.
+  horasNormales: z.number().min(0).max(24).nullable(),
+  horasExtra50: z.number().min(0).max(24).default(0),
+  horasExtra100: z.number().min(0).max(24).default(0),
 });
 router.put("/horas-manual", requireAdmin, async (req, res) => {
   const parsed = horasManualSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const { employeeId, fecha, horasTrabajadas } = parsed.data;
+  const { employeeId, fecha, horasNormales, horasExtra50, horasExtra100 } = parsed.data;
   const dia = utcDateOnlyFrom(fecha);
 
-  if (horasTrabajadas === null) {
+  if (horasNormales === null) {
     await prisma.dailyCalculation.update({
       where: { employeeId_fecha: { employeeId, fecha: dia } },
       data: { horasManual: false },
@@ -232,12 +237,18 @@ router.put("/horas-manual", requireAdmin, async (req, res) => {
     return res.json(calculo);
   }
 
-  const existente = await prisma.dailyCalculation.findUnique({ where: { employeeId_fecha: { employeeId, fecha: dia } } });
-  if (!existente) return res.status(404).json({ error: "No hay cálculo para ese día" });
-  const horasNormales = Math.max(0, horasTrabajadas - existente.horasExtra50 - existente.horasExtra100);
   const calculo = await prisma.dailyCalculation.update({
     where: { employeeId_fecha: { employeeId, fecha: dia } },
-    data: { horasNormales, horasManual: true, ausente: false },
+    data: {
+      horasNormales,
+      horasExtra50,
+      horasExtra100,
+      horasManual: true,
+      ausente: false,
+      extrasValidadas: false,
+      validadoPorId: null,
+      fechaValidacion: null,
+    },
   });
   res.json(calculo);
 });
