@@ -11,6 +11,22 @@ interface Empleado {
   apellido: string;
 }
 
+interface FilaPlanilla {
+  nombre: string;
+  legajo: string;
+  horasNormales: number;
+  horasExtra50: number;
+  horasExtra100: number;
+  horasFranco: number;
+  horasVacaciones: number;
+  horasEnfermedad: number;
+  montoNormal: number;
+  montoExtra50: number;
+  montoExtra100: number;
+  montoFranco: number;
+  montoTotal: number;
+}
+
 interface Liquidacion {
   id: string;
   employee: { nombre: string; apellido: string };
@@ -111,6 +127,10 @@ export default function Liquidaciones() {
 
   const [planilla, setPlanilla] = useState({ fechaDesde: firstOfMonth(), fechaHasta: today() });
   const [exportandoPlanilla, setExportandoPlanilla] = useState(false);
+  const verPlanilla = useMutation({
+    mutationFn: async () =>
+      (await api.get(`/liquidaciones/planilla?desde=${planilla.fechaDesde}&hasta=${planilla.fechaHasta}`)).data as FilaPlanilla[],
+  });
   async function exportarPlanillaGeneral() {
     setExportandoPlanilla(true);
     try {
@@ -224,13 +244,64 @@ export default function Liquidaciones() {
             />
           </div>
           <button
-            onClick={exportarPlanillaGeneral}
-            disabled={exportandoPlanilla}
+            onClick={() => verPlanilla.mutate()}
+            disabled={verPlanilla.isPending}
             className="bg-primary text-white text-sm px-4 py-2 rounded-md hover:bg-primary-dark disabled:opacity-50"
           >
-            {exportandoPlanilla ? "Generando..." : "Exportar planilla general"}
+            {verPlanilla.isPending ? "Calculando..." : "Ver planilla"}
+          </button>
+          <button
+            onClick={exportarPlanillaGeneral}
+            disabled={exportandoPlanilla}
+            className="btn-secondary text-sm px-4 py-2"
+          >
+            {exportandoPlanilla ? "Generando..." : "Exportar a Excel"}
           </button>
         </div>
+
+        {verPlanilla.isError && <p className="text-red-600 text-sm mt-2">No se pudo calcular la planilla</p>}
+
+        {verPlanilla.data && (
+          <div className="overflow-x-auto mt-4">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-slate-500 border-b">
+                  <th className="pb-2 pr-3">Empleado</th>
+                  <th className="pb-2 pr-3">Legajo</th>
+                  <th className="pb-2 pr-3">Hs. normales</th>
+                  <th className="pb-2 pr-3">Hs. extra 50%</th>
+                  <th className="pb-2 pr-3">Hs. extra 100%</th>
+                  <th className="pb-2 pr-3">Franco comp.</th>
+                  <th className="pb-2 pr-3">Hs. vacaciones</th>
+                  <th className="pb-2 pr-3">Hs. enfermedad</th>
+                  <th className="pb-2">Total $</th>
+                </tr>
+              </thead>
+              <tbody>
+                {verPlanilla.data.map((f) => (
+                  <tr key={f.legajo} className="border-b last:border-0">
+                    <td className="py-2 pr-3 whitespace-nowrap">{f.nombre}</td>
+                    <td className="py-2 pr-3">{f.legajo}</td>
+                    <td className="py-2 pr-3">{f.horasNormales.toFixed(1)}</td>
+                    <td className="py-2 pr-3">{f.horasExtra50.toFixed(1)}</td>
+                    <td className="py-2 pr-3">{f.horasExtra100.toFixed(1)}</td>
+                    <td className="py-2 pr-3">{f.horasFranco.toFixed(1)}</td>
+                    <td className="py-2 pr-3">{f.horasVacaciones.toFixed(1)}</td>
+                    <td className="py-2 pr-3">{f.horasEnfermedad.toFixed(1)}</td>
+                    <td className="py-2 font-medium">${f.montoTotal.toLocaleString("es-AR", { maximumFractionDigits: 0 })}</td>
+                  </tr>
+                ))}
+                {verPlanilla.data.length === 0 && (
+                  <tr>
+                    <td colSpan={9} className="py-3 text-center text-slate-400">
+                      No hay empleados activos.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="card p-5">
