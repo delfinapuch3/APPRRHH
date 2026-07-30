@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client.js";
 import { InfoTip } from "../components/InfoTip.js";
 import { invalidarAsistenciaRelacionada } from "../lib/invalidarAsistencia.js";
+import { useConfirm } from "../components/ConfirmProvider.js";
 
 const ESTADOS = ["PENDIENTE", "TOMADO"] as const;
 
@@ -14,13 +15,32 @@ interface Franco {
   estado: string;
 }
 
+function firstOfMonth() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function Francos() {
   const queryClient = useQueryClient();
+  const confirmar = useConfirm();
   const [estado, setEstado] = useState<string>("");
+  const [desde, setDesde] = useState(firstOfMonth());
+  const [hasta, setHasta] = useState(today());
+
+  function queryParams() {
+    const params = new URLSearchParams();
+    if (estado) params.set("estado", estado);
+    if (desde) params.set("desde", desde);
+    if (hasta) params.set("hasta", hasta);
+    return params.toString();
+  }
 
   const { data: francos, isLoading } = useQuery({
-    queryKey: ["francos-list", estado],
-    queryFn: async () => (await api.get(`/francos${estado ? `?estado=${estado}` : ""}`)).data as Franco[],
+    queryKey: ["francos-list", estado, desde, hasta],
+    queryFn: async () => (await api.get(`/francos?${queryParams()}`)).data as Franco[],
   });
 
   const actualizar = useMutation({
@@ -29,8 +49,26 @@ export default function Francos() {
     onSuccess: () => invalidarAsistenciaRelacionada(queryClient),
   });
 
+  const eliminar = useMutation({
+    mutationFn: async (id: string) => api.delete(`/francos/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["francos-list"] });
+      invalidarAsistenciaRelacionada(queryClient);
+    },
+  });
+
+  async function confirmarEliminar(f: Franco) {
+    const ok = await confirmar({
+      titulo: "Eliminar franco compensatorio",
+      mensaje: `¿Eliminar el franco de ${f.employee.apellido}, ${f.employee.nombre} generado el ${new Date(f.fechaGenerado).toLocaleDateString("es-AR", { timeZone: "UTC" })}? Esta acción no se puede deshacer. Si el día que lo generó sigue vigente, puede volver a crearse solo la próxima vez que se recalculen las horas de ese empleado.`,
+      textoConfirmar: "Eliminar",
+      peligro: true,
+    });
+    if (ok) eliminar.mutate(f.id);
+  }
+
   async function exportar() {
-    const res = await api.get(`/francos/export.xlsx${estado ? `?estado=${estado}` : ""}`, { responseType: "blob" });
+    const res = await api.get(`/francos/export.xlsx?${queryParams()}`, { responseType: "blob" });
     const url = URL.createObjectURL(res.data as Blob);
     const a = document.createElement("a");
     a.href = url;
@@ -51,7 +89,7 @@ export default function Francos() {
         </button>
       </div>
 
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 flex gap-2 items-end flex-wrap">
         {["", ...ESTADOS].map((e) => (
           <button
             key={e}
@@ -61,6 +99,35 @@ export default function Francos() {
             {e || "Todos"}
           </button>
         ))}
+        <div className="ml-4">
+          <label className="block text-xs text-slate-500 mb-1">Desde</label>
+          <input
+            type="date"
+            value={desde}
+            onChange={(e) => setDesde(e.target.value)}
+            className="border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-slate-500 mb-1">Hasta</label>
+          <input
+            type="date"
+            value={hasta}
+            onChange={(e) => setHasta(e.target.value)}
+            className="border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+          />
+        </div>
+        {(desde || hasta) && (
+          <button
+            onClick={() => {
+              setDesde("");
+              setHasta("");
+            }}
+            className="text-sm text-slate-500 hover:underline"
+          >
+            Quitar filtro de fecha
+          </button>
+        )}
       </div>
 
       <div className="card p-5">
@@ -97,9 +164,19 @@ export default function Francos() {
                         Marcar tomado
                       </button>
                     )}
+                    <button onClick={() => confirmarEliminar(f)} className="text-red-600 underline text-sm ml-3">
+                      Eliminar
+                    </button>
                   </td>
                 </tr>
               ))}
+              {francos?.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-3 text-center text-slate-400">
+                    No hay francos en el período elegido.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         )}

@@ -8,10 +8,16 @@ const router = Router();
 
 function buildWhere(req: import("express").Request) {
   const scope = sectorScope(req);
-  const { employeeId, estado } = req.query as Record<string, string | undefined>;
+  const { employeeId, estado, desde, hasta } = req.query as Record<string, string | undefined>;
   const where: Record<string, unknown> = {};
   if (employeeId) where.employeeId = employeeId;
   if (estado) where.estado = estado;
+  if (desde || hasta) {
+    where.fechaGenerado = {
+      ...(desde ? { gte: new Date(desde) } : {}),
+      ...(hasta ? { lte: new Date(hasta) } : {}),
+    };
+  }
   if (scope) where.employee = { sectorId: { in: scope } };
   return where;
 }
@@ -58,6 +64,11 @@ router.put("/:id", async (req, res) => {
     data: parsed.data,
   });
   res.json(franco);
+});
+
+router.delete("/:id", async (req, res) => {
+  await prisma.francoCompensatorio.delete({ where: { id: req.params.id } });
+  res.status(204).end();
 });
 
 export default router;
