@@ -244,6 +244,7 @@ model Absence {
 
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   cargadoPor User     @relation(fields: [cargadoPorId], references: [id])
+  vacationPeriod VacationPeriod?
 }
 
 model VacationPeriod {
@@ -255,8 +256,14 @@ model VacationPeriod {
   diasTomados       Int
   observaciones     String?
   createdAt         DateTime @default(now())
+  // Cuando el período se generó desde el formulario de Ausencias (motivo
+  // "Vacaciones"), queda vinculado a esa ausencia: si se borra o cambia de
+  // motivo, este período se borra o actualiza con ella en vez de quedar
+  // huérfano descontando un balance que ya no corresponde.
+  absenceId         String?  @unique
 
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  absence  Absence? @relation(fields: [absenceId], references: [id], onDelete: Cascade)
 }
 
 model FrancoCompensatorio {

@@ -41,7 +41,7 @@ function buildWhere(req: import("express").Request) {
 router.get("/", async (req, res) => {
   const ausencias = await prisma.absence.findMany({
     where: buildWhere(req),
-    include: { employee: true, cargadoPor: { select: { nombre: true } } },
+    include: { employee: true, cargadoPor: { select: { nombre: true } }, vacationPeriod: true },
     orderBy: { fechaDesde: "desc" },
   });
   res.json(ausencias);
@@ -91,19 +91,70 @@ const ausenciaBaseSchema = z.object({
   tipo: z.enum(TIPOS),
   justificada: z.boolean(),
   observaciones: z.string().optional(),
+  // Solo aplica cuando tipo === "VACACIONES" y justificada === true: a qué
+  // año se le descuentan estos días (puede ser un año anterior, ej.
+  // vacaciones pendientes/adeudadas de 2025 tomadas en 2026).
+  anioCorrespondiente: z.number().int().optional(),
 });
 
-const ausenciaSchema = ausenciaBaseSchema.refine(
-  (data) => data.tipo !== "OTRA" || (data.observaciones?.trim().length ?? 0) > 0,
-  { message: "Para el tipo 'Otra' hay que aclarar el motivo en observaciones", path: ["observaciones"] }
-);
+const ausenciaSchema = ausenciaBaseSchema
+  .refine((data) => data.tipo !== "OTRA" || (data.observaciones?.trim().length ?? 0) > 0, {
+    message: "Para el tipo 'Otra' hay que aclarar el motivo en observaciones",
+    path: ["observaciones"],
+  })
+  .refine((data) => data.tipo !== "VACACIONES" || !data.justificada || data.anioCorrespondiente != null, {
+    message: "Para Vacaciones hay que indicar a qué año corresponden los días",
+    path: ["anioCorrespondiente"],
+  });
+
+function diasEntre(desde: Date, hasta: Date): number {
+  return Math.round((hasta.getTime() - desde.getTime()) / 86_400_000) + 1;
+}
+
+/**
+ * Mantiene sincronizado el VacationPeriod vinculado a una ausencia tipo
+ * "Vacaciones": lo crea, actualiza o borra según corresponda, para que el
+ * Historial de vacaciones y el balance por año reflejen lo que se carga
+ * desde el formulario de Ausencias sin que RRHH tenga que cargarlo dos veces.
+ */
+async function sincronizarPeriodoVacaciones(
+  ausencia: { id: string; employeeId: string; tipo: string; justificada: boolean; fechaDesde: Date; fechaHasta: Date; observaciones: string | null },
+  anioCorrespondienteBody: number | undefined
+) {
+  const periodoExistente = await prisma.vacationPeriod.findUnique({ where: { absenceId: ausencia.id } });
+  // En una edición parcial que no toca el año, se conserva el año que ya
+  // tenía el período vinculado en vez de asumir que se quiere desvincular.
+  const anioCorrespondiente = anioCorrespondienteBody ?? periodoExistente?.anioCorrespondiente;
+  const corresponde = ausencia.tipo === "VACACIONES" && ausencia.justificada && anioCorrespondiente != null;
+
+  if (!corresponde) {
+    if (periodoExistente) await prisma.vacationPeriod.delete({ where: { id: periodoExistente.id } });
+    return;
+  }
+
+  const data = {
+    employeeId: ausencia.employeeId,
+    anioCorrespondiente: anioCorrespondiente!,
+    fechaDesde: ausencia.fechaDesde,
+    fechaHasta: ausencia.fechaHasta,
+    diasTomados: diasEntre(ausencia.fechaDesde, ausencia.fechaHasta),
+    observaciones: ausencia.observaciones,
+  };
+  if (periodoExistente) {
+    await prisma.vacationPeriod.update({ where: { id: periodoExistente.id }, data });
+  } else {
+    await prisma.vacationPeriod.create({ data: { ...data, absenceId: ausencia.id } });
+  }
+}
 
 router.post("/", async (req, res) => {
   const parsed = ausenciaSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const { anioCorrespondiente, ...data } = parsed.data;
   const ausencia = await prisma.absence.create({
-    data: { ...parsed.data, cargadoPorId: req.user!.id },
+    data: { ...data, cargadoPorId: req.user!.id },
   });
+  await sincronizarPeriodoVacaciones(ausencia, anioCorrespondiente);
   await recalcularEmpleadoPeriodo(ausencia.employeeId, ausencia.fechaDesde, ausencia.fechaHasta);
   res.status(201).json(ausencia);
 });
@@ -111,7 +162,9 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   const parsed = ausenciaBaseSchema.partial().safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const ausencia = await prisma.absence.update({ where: { id: req.params.id }, data: parsed.data });
+  const { anioCorrespondiente, ...data } = parsed.data;
+  const ausencia = await prisma.absence.update({ where: { id: req.params.id }, data });
+  await sincronizarPeriodoVacaciones(ausencia, anioCorrespondiente);
   await recalcularEmpleadoPeriodo(ausencia.employeeId, ausencia.fechaDesde, ausencia.fechaHasta);
   res.json(ausencia);
 });

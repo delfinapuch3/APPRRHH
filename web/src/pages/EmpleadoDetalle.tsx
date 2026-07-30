@@ -16,6 +16,7 @@ interface AusenciaItem {
   fechaHasta: string;
   justificada: boolean;
   observaciones: string | null;
+  vacationPeriod: { anioCorrespondiente: number } | null;
 }
 
 interface FrancoItem {
@@ -208,17 +209,26 @@ export default function EmpleadoDetalle() {
   });
 
   // --- nueva ausencia manual / edición de una ausencia existente ---
+  const anioActual = new Date().getFullYear();
   const [nuevaAusencia, setNuevaAusencia] = useState({
     fechaDesde: "",
     fechaHasta: "",
     tipo: "PERMISO_PERSONAL",
     justificada: true,
     observaciones: "",
+    anioCorrespondiente: String(anioActual),
   });
   const [editandoAusenciaId, setEditandoAusenciaId] = useState<string | null>(null);
   function cancelarEdicionAusencia() {
     setEditandoAusenciaId(null);
-    setNuevaAusencia({ fechaDesde: "", fechaHasta: "", tipo: "PERMISO_PERSONAL", justificada: true, observaciones: "" });
+    setNuevaAusencia({
+      fechaDesde: "",
+      fechaHasta: "",
+      tipo: "PERMISO_PERSONAL",
+      justificada: true,
+      observaciones: "",
+      anioCorrespondiente: String(anioActual),
+    });
   }
   const crearAusencia = useMutation({
     mutationFn: async () => {
@@ -229,6 +239,8 @@ export default function EmpleadoDetalle() {
         tipo: nuevaAusencia.justificada ? nuevaAusencia.tipo : "INJUSTIFICADA",
         justificada: nuevaAusencia.justificada,
         observaciones: nuevaAusencia.observaciones || undefined,
+        anioCorrespondiente:
+          nuevaAusencia.justificada && nuevaAusencia.tipo === "VACACIONES" ? Number(nuevaAusencia.anioCorrespondiente) : undefined,
       };
       return editandoAusenciaId ? api.put(`/ausencias/${editandoAusenciaId}`, data) : api.post("/ausencias", data);
     },
@@ -248,7 +260,12 @@ export default function EmpleadoDetalle() {
 
   // --- clasificar un día detectado como falta (sin fichada) ---
   const [faltaEnEdicion, setFaltaEnEdicion] = useState<string | null>(null); // fecha YYYY-MM-DD
-  const [claseFalta, setClaseFalta] = useState({ tipo: "PERMISO_PERSONAL", justificada: true, observaciones: "" });
+  const [claseFalta, setClaseFalta] = useState({
+    tipo: "PERMISO_PERSONAL",
+    justificada: true,
+    observaciones: "",
+    anioCorrespondiente: String(anioActual),
+  });
   const clasificarFalta = useMutation({
     mutationFn: async () =>
       api.post("/ausencias", {
@@ -258,12 +275,13 @@ export default function EmpleadoDetalle() {
         tipo: claseFalta.justificada ? claseFalta.tipo : "INJUSTIFICADA",
         justificada: claseFalta.justificada,
         observaciones: claseFalta.observaciones || undefined,
+        anioCorrespondiente: claseFalta.justificada && claseFalta.tipo === "VACACIONES" ? Number(claseFalta.anioCorrespondiente) : undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ausencias", id] });
       invalidarAsistenciaRelacionada(queryClient);
       setFaltaEnEdicion(null);
-      setClaseFalta({ tipo: "PERMISO_PERSONAL", justificada: true, observaciones: "" });
+      setClaseFalta({ tipo: "PERMISO_PERSONAL", justificada: true, observaciones: "", anioCorrespondiente: String(anioActual) });
     },
   });
 
@@ -644,6 +662,22 @@ export default function EmpleadoDetalle() {
                   </select>
                 </div>
               )}
+              {nuevaAusencia.justificada && nuevaAusencia.tipo === "VACACIONES" && (
+                <div className="col-span-2">
+                  <label className="block text-xs text-slate-500 mb-1">Año correspondiente</label>
+                  <input
+                    type="number"
+                    required
+                    value={nuevaAusencia.anioCorrespondiente}
+                    onChange={(e) => setNuevaAusencia({ ...nuevaAusencia, anioCorrespondiente: e.target.value })}
+                    className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">
+                    Se descuenta del balance de vacaciones de ese año (puede ser un año anterior, ej. vacaciones pendientes) y
+                    aparece en el Historial de vacaciones.
+                  </p>
+                </div>
+              )}
               <div className="col-span-2">
                 <label className="block text-xs text-slate-500 mb-1">
                   Observaciones {nuevaAusencia.justificada && nuevaAusencia.tipo === "OTRA" ? "(obligatorio: aclarar el motivo)" : ""}
@@ -716,7 +750,7 @@ export default function EmpleadoDetalle() {
                           <button
                             onClick={() => {
                               setFaltaEnEdicion(d.fecha.slice(0, 10));
-                              setClaseFalta({ tipo: "PERMISO_PERSONAL", justificada: true, observaciones: "" });
+                              setClaseFalta({ tipo: "PERMISO_PERSONAL", justificada: true, observaciones: "", anioCorrespondiente: String(anioActual) });
                             }}
                             className="text-slate-700 underline text-xs"
                           >
@@ -759,6 +793,7 @@ export default function EmpleadoDetalle() {
                             tipo: a.tipo,
                             justificada: a.justificada,
                             observaciones: a.observaciones ?? "",
+                            anioCorrespondiente: String(a.vacationPeriod?.anioCorrespondiente ?? anioActual),
                           });
                         }}
                         className="text-slate-700 underline text-xs"
@@ -988,6 +1023,21 @@ export default function EmpleadoDetalle() {
                     </option>
                   ))}
                 </select>
+              </div>
+            )}
+            {claseFalta.justificada && claseFalta.tipo === "VACACIONES" && (
+              <div className="mb-3">
+                <label className="block text-xs text-slate-500 mb-1">Año correspondiente</label>
+                <input
+                  type="number"
+                  required
+                  value={claseFalta.anioCorrespondiente}
+                  onChange={(e) => setClaseFalta({ ...claseFalta, anioCorrespondiente: e.target.value })}
+                  className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  Se descuenta del balance de vacaciones de ese año y aparece en el Historial de vacaciones.
+                </p>
               </div>
             )}
             <div className="mb-4">
