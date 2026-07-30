@@ -6,6 +6,8 @@ const KEYS_ASISTENCIA_RELACIONADA = [
   "asistencia-empleado",
   "faltas-sin-clasificar",
   "vacaciones-balance",
+  "vacaciones-periodos",
+  "vacaciones-historial",
   "francos-list",
   "francos",
   "ausencias",

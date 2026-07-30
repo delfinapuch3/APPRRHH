@@ -135,6 +135,23 @@ export default function EmpleadoDetalle() {
     queryFn: async () => (await api.get(`/vacaciones/${id}/balance?anio=${anioVacaciones}`)).data,
     enabled: tab === "vacaciones",
   });
+  // Todos los períodos de vacaciones del empleado (cualquier año): se
+  // muestran tanto en Ausencias (para que se vean los días que estuvo
+  // ausente por vacaciones, aclarando a qué año correspondieron) como en
+  // Vacaciones (para no tener que ir cambiando el año para encontrarlos).
+  interface PeriodoVacacion {
+    id: string;
+    anioCorrespondiente: number;
+    fechaDesde: string;
+    fechaHasta: string;
+    diasTomados: number;
+    observaciones: string | null;
+  }
+  const { data: vacacionesTodas } = useQuery({
+    queryKey: ["vacaciones-periodos", id],
+    queryFn: async () => (await api.get(`/vacaciones?employeeId=${id}`)).data as PeriodoVacacion[],
+    enabled: tab === "ausencias" || tab === "vacaciones",
+  });
   const { data: francos } = useQuery({
     queryKey: ["francos", id],
     queryFn: async () => (await api.get(`/francos?employeeId=${id}`)).data as FrancoItem[],
@@ -287,17 +304,22 @@ export default function EmpleadoDetalle() {
   });
 
   // --- cargar / editar / eliminar un período de vacaciones ---
-  const [nuevaVacacion, setNuevaVacacion] = useState({ fechaDesde: "", fechaHasta: "", diasTomados: "" });
+  const [nuevaVacacion, setNuevaVacacion] = useState({
+    fechaDesde: "",
+    fechaHasta: "",
+    diasTomados: "",
+    anioCorrespondiente: String(anioVacaciones),
+  });
   const [editandoVacacionId, setEditandoVacacionId] = useState<string | null>(null);
   function cancelarEdicionVacacion() {
     setEditandoVacacionId(null);
-    setNuevaVacacion({ fechaDesde: "", fechaHasta: "", diasTomados: "" });
+    setNuevaVacacion({ fechaDesde: "", fechaHasta: "", diasTomados: "", anioCorrespondiente: String(anioVacaciones) });
   }
   const guardarVacacion = useMutation({
     mutationFn: async () => {
       const data = {
         employeeId: id,
-        anioCorrespondiente: vacaciones?.anio ?? new Date().getFullYear(),
+        anioCorrespondiente: Number(nuevaVacacion.anioCorrespondiente),
         fechaDesde: nuevaVacacion.fechaDesde,
         fechaHasta: nuevaVacacion.fechaHasta,
         diasTomados: Number(nuevaVacacion.diasTomados),
@@ -306,6 +328,7 @@ export default function EmpleadoDetalle() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vacaciones-balance", id] });
+      queryClient.invalidateQueries({ queryKey: ["vacaciones-periodos", id] });
       invalidarAsistenciaRelacionada(queryClient);
       cancelarEdicionVacacion();
     },
@@ -314,6 +337,7 @@ export default function EmpleadoDetalle() {
     mutationFn: async (vacacionId: string) => api.delete(`/vacaciones/${vacacionId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vacaciones-balance", id] });
+      queryClient.invalidateQueries({ queryKey: ["vacaciones-periodos", id] });
       invalidarAsistenciaRelacionada(queryClient);
     },
   });
@@ -820,6 +844,38 @@ export default function EmpleadoDetalle() {
                 ))}
               </tbody>
             </table>
+
+            <h3 className="text-sm font-medium text-slate-700 mb-2 mt-6">Vacaciones tomadas</h3>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-slate-500 border-b">
+                  <th className="pb-2">Desde</th>
+                  <th className="pb-2">Hasta</th>
+                  <th className="pb-2">Año correspondiente</th>
+                  <th className="pb-2">Días</th>
+                  <th className="pb-2">Observaciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vacacionesTodas?.map((p) => (
+                  <tr key={p.id} className="border-b last:border-0">
+                    <td className="py-2">{new Date(p.fechaDesde).toLocaleDateString("es-AR", { timeZone: "UTC" })}</td>
+                    <td className="py-2">{new Date(p.fechaHasta).toLocaleDateString("es-AR", { timeZone: "UTC" })}</td>
+                    <td className="py-2">{p.anioCorrespondiente}</td>
+                    <td className="py-2">{p.diasTomados}</td>
+                    <td className="py-2">{p.observaciones ?? "-"}</td>
+                  </tr>
+                ))}
+                {vacacionesTodas?.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-3 text-center text-slate-400">
+                      Sin vacaciones tomadas todavía.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            <p className="text-xs text-slate-400 mt-1">Para editar o eliminar un período, andá a la pestaña Vacaciones.</p>
           </div>
         )}
 
@@ -894,6 +950,16 @@ export default function EmpleadoDetalle() {
                   className="border border-slate-300 rounded-md px-2 py-1.5 text-sm w-20"
                 />
               </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Año correspondiente</label>
+                <input
+                  type="number"
+                  required
+                  value={nuevaVacacion.anioCorrespondiente}
+                  onChange={(e) => setNuevaVacacion({ ...nuevaVacacion, anioCorrespondiente: e.target.value })}
+                  className="border border-slate-300 rounded-md px-2 py-1.5 text-sm w-24"
+                />
+              </div>
               <button
                 type="submit"
                 disabled={guardarVacacion.isPending}
@@ -908,21 +974,24 @@ export default function EmpleadoDetalle() {
               )}
             </form>
 
+            <p className="text-xs text-slate-400 mb-2">Todos los períodos de vacaciones cargados, de cualquier año.</p>
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-slate-500 border-b">
                   <th className="pb-2">Desde</th>
                   <th className="pb-2">Hasta</th>
                   <th className="pb-2">Días</th>
+                  <th className="pb-2">Año correspondiente</th>
                   <th className="pb-2"></th>
                 </tr>
               </thead>
               <tbody>
-                {vacaciones.periodos.map((p: any) => (
+                {vacacionesTodas?.map((p) => (
                   <tr key={p.id} className="border-b last:border-0">
                     <td className="py-2">{new Date(p.fechaDesde).toLocaleDateString("es-AR", { timeZone: "UTC" })}</td>
                     <td className="py-2">{new Date(p.fechaHasta).toLocaleDateString("es-AR", { timeZone: "UTC" })}</td>
                     <td className="py-2">{p.diasTomados}</td>
+                    <td className="py-2">{p.anioCorrespondiente}</td>
                     <td className="py-2 text-right">
                       <button
                         onClick={() => {
@@ -931,6 +1000,7 @@ export default function EmpleadoDetalle() {
                             fechaDesde: p.fechaDesde.slice(0, 10),
                             fechaHasta: p.fechaHasta.slice(0, 10),
                             diasTomados: String(p.diasTomados),
+                            anioCorrespondiente: String(p.anioCorrespondiente),
                           });
                         }}
                         className="text-slate-700 underline text-xs"
