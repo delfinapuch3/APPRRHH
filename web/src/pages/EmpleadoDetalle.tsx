@@ -129,9 +129,10 @@ export default function EmpleadoDetalle() {
     queryFn: async () => (await api.get(`/ausencias?employeeId=${id}`)).data as AusenciaItem[],
     enabled: tab === "ausencias",
   });
+  const [anioVacaciones, setAnioVacaciones] = useState(new Date().getFullYear());
   const { data: vacaciones } = useQuery({
-    queryKey: ["vacaciones-balance", id],
-    queryFn: async () => (await api.get(`/vacaciones/${id}/balance`)).data,
+    queryKey: ["vacaciones-balance", id, anioVacaciones],
+    queryFn: async () => (await api.get(`/vacaciones/${id}/balance?anio=${anioVacaciones}`)).data,
     enabled: tab === "vacaciones",
   });
   const { data: francos } = useQuery({
@@ -824,6 +825,19 @@ export default function EmpleadoDetalle() {
 
         {tab === "vacaciones" && vacaciones && (
           <div>
+            <div className="mb-4">
+              <label className="block text-xs text-slate-500 mb-1">Año</label>
+              <input
+                type="number"
+                value={anioVacaciones}
+                onChange={(e) => setAnioVacaciones(Number(e.target.value))}
+                className="w-28 border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                Cambiá el año para ver o cargar vacaciones pendientes/adeudadas de años anteriores.
+              </p>
+            </div>
+
             <div className="grid grid-cols-3 gap-4 mb-6">
               <div>
                 <div className="text-sm text-slate-500">Días correspondientes</div>
